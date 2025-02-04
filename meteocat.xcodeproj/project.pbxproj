@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -12,6 +12,8 @@
 		50EF9FC02CD3846B0066CAAE /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FBF2CD3846B0066CAAE /* Item.swift */; };
 		50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC12CD3846D0066CAAE /* Assets.xcassets */; };
 		50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */; };
+		50EF9FCC2CD384860066CAAE /* Requester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FCB2CD384860066CAAE /* Requester.swift */; };
+		50EF9FCF2CD384C60066CAAE /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 50EF9FCE2CD384C60066CAAE /* SwiftSoup */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,13 +23,19 @@
 		50EF9FBF2CD3846B0066CAAE /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
 		50EF9FC12CD3846D0066CAAE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		50EF9FCB2CD384860066CAAE /* Requester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Requester.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		50F89E3C2D52036F00F7884F /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		50EF9FB52CD3846B0066CAAE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50EF9FCF2CD384C60066CAAE /* SwiftSoup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +61,9 @@
 		50EF9FBA2CD3846B0066CAAE /* meteocat */ = {
 			isa = PBXGroup;
 			children = (
+				50F89E3C2D52036F00F7884F /* Views */,
 				50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */,
+				50EF9FCB2CD384860066CAAE /* Requester.swift */,
 				50EF9FBD2CD3846B0066CAAE /* ContentView.swift */,
 				50EF9FBF2CD3846B0066CAAE /* Item.swift */,
 				50EF9FC12CD3846D0066CAAE /* Assets.xcassets */,
@@ -85,7 +95,13 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				50F89E3C2D52036F00F7884F /* Views */,
+			);
 			name = meteocat;
+			packageProductDependencies = (
+				50EF9FCE2CD384C60066CAAE /* SwiftSoup */,
+			);
 			productName = meteocat;
 			productReference = 50EF9FB82CD3846B0066CAAE /* meteocat.app */;
 			productType = "com.apple.product-type.application";
@@ -114,6 +130,9 @@
 				Base,
 			);
 			mainGroup = 50EF9FAF2CD3846B0066CAAE;
+			packageReferences = (
+				50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */,
+			);
 			productRefGroup = 50EF9FB92CD3846B0066CAAE /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -142,6 +161,7 @@
 			files = (
 				50EF9FBE2CD3846B0066CAAE /* ContentView.swift in Sources */,
 				50EF9FC02CD3846B0066CAAE /* Item.swift in Sources */,
+				50EF9FCC2CD384860066CAAE /* Requester.swift in Sources */,
 				50EF9FBC2CD3846B0066CAAE /* meteocatApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -273,6 +293,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"meteocat/Preview Content\"";
@@ -291,6 +312,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pskmoons.meteocat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -302,6 +324,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"meteocat/Preview Content\"";
@@ -320,6 +343,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pskmoons.meteocat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -348,6 +372,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		50EF9FCE2CD384C60066CAAE /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 50EF9FB02CD3846B0066CAAE /* Project object */;
 }
