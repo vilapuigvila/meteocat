@@ -11,9 +11,15 @@ import FoundationXML // Necessary for XML parsing on certain platforms
 #endif
 import `SwiftSoup` // Add SwiftSoup for HTML parsing
 
+struct StationModel: Decodable, Hashable, Sendable {
+    let name: String
+    let key: String
+    let value: String
+    let date: String?
+}
+
 struct Requester {
-    
-    static func requestOris(code: String, date: Date? = nil) async throws -> [Representable] {
+    static func requestStation(code: String, date: Date? = nil) async throws -> [StationModel] {
         assert(!code.isEmpty)
         
         let currentDate = date ?? Date()
@@ -33,11 +39,20 @@ struct Requester {
             }
             let document = try SwiftSoup.parse(htmlContent)
             
+            let stationName: String = {
+                guard let fitxa = try? document.select("#fitxa-ema").first(),
+                      let value = try? fitxa.select("h2").first()?.text() ?? "not found"
+                else {
+                    return "not found"
+                }
+                return value
+            }()
+            
             // Step 4: Select the table with the "Resum diari" data (the first <table> element)
             guard let table = try document.select("table").first() else {
                 throw NSError(domain: "Invalid HTML structure", code: 0, userInfo: nil)
             }
-            var items: [Representable] = []
+            var items: [StationModel] = []
             
             // Step 5: Select all rows in the table (excluding the header)
             let rows = try table.select("tr")
@@ -55,7 +70,7 @@ struct Requester {
                     
                     // Step 6: Print the title and value in the desired format
                     print("\(title)\t\(value)")
-                    items.append(Representable(key: title, value: value, date: nil))
+                    items.append(StationModel(name: stationName, key: title, value: value, date: nil))
                 }
                 
                 // Extract the title (first column) and value (second column)
@@ -64,7 +79,7 @@ struct Requester {
                     let value = try columns.get(1).text()
                     let value2 = try columns.get(2).text()
                     
-                    items.append(Representable(key: title, value: value, date: value2))
+                    items.append(StationModel(name: stationName, key: title, value: value, date: value2))
                 }
             }
             return items
@@ -137,55 +152,3 @@ struct Requester {
         }
     }
 }
-
-struct Representable: Hashable {
-    let key: String
-    let value: String
-    let date: String?
-}
-
-final class HomeViewModel: ObservableObject {
-    @Published var reprsentable: [Representable]
-    @Published var stationName: String
-    init(reprsentable: [Representable], stationName: String) {
-        self.reprsentable = reprsentable
-        self.stationName = stationName
-    }
-}
-
-// 📌 Define the structures that match the JSON structure
-struct Station: Decodable, Hashable {
-    let codi: String
-    let nom: String
-    let tipus: String
-    let coordenades: Coordinates
-    let emplacament: String
-    let altitud: Double
-    let municipi: City
-    let comarca: Region
-    let estats: [State]
-
-    struct Coordinates: Decodable, Hashable {
-        let latitud: Double
-        let longitud: Double
-    }
-    struct City: Decodable, Hashable {
-        let codi: String
-        let nom: String
-        let slug: String?
-        let coordenades: Coordinates?
-        let comarca: String?
-    }
-    struct Region: Decodable, Hashable {
-        let codi: Int
-        let nom: String
-    }
-    
-    struct State: Decodable, Hashable {
-        let codi: Int
-        let dataInici: String
-        let dataFi: String?
-    }
-}
-
-typealias Stations = [String: Station]
