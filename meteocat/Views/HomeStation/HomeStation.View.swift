@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct HomeStationView: View {
     
@@ -26,40 +27,54 @@ extension HomeStation {
         
         @State private var selectedDate = Date()
         @State private var isDatePickerVisible = true
-        @State private var isLoading = true
+        @State private var isLoading = false
         
         let stationName: String?
         let state: HomeStation.ViewState
         let action: (HomeStation.Action) -> Void
         
         var body: some View {
-            VStack {
-                List {
-                    Section(header: buildHeaderView()) {
-                        ForEach(state.result, id: \.self) { item in
-                            VStack(spacing: 8) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text("\(item.key)")
-                                    Spacer()
-                                    Text("\(item.value)")
-                                }
-                                if let date = item.date {
-                                    HStack {
-                                        Spacer()
-                                        Text(date)
-                                            .font(.custom("Poppins-Bold", size: 12))
-                                            .foregroundStyle(.gray)
+            Group {
+                if case .error(let errorView) = state {
+                    switch errorView {
+                    case .missingStationCode:
+                        Text("Please select a station from the list.")
+                    case .networkFailure:
+                        Text("Network Error")
+                    }
+                } else {
+                    VStack {
+                        List {
+                            Section(header: buildHeaderView()) {
+                                ForEach(state.result, id: \.self) { item in
+                                    VStack(spacing: 8) {
+                                        HStack(alignment: .firstTextBaseline) {
+                                            Text("\(item.key)")
+                                            Spacer()
+                                            Text("\(item.value)")
+                                        }
+                                        if let date = item.date {
+                                            HStack {
+                                                Spacer()
+                                                Text(date)
+                                                    .font(.custom("Poppins-Bold", size: 12))
+                                                    .foregroundStyle(.gray)
+                                            }
+                                        }
                                     }
+                                    .padding([.top, .bottom], 12)
                                 }
                             }
-                            .padding([.top, .bottom], 12)
                         }
+                        .listRowSeparator(.visible)
                     }
                 }
-                .listRowSeparator(.visible)
             }
             .onAppear {
-                action(.request(date: Date()))
+                action(.onAppear)
+            }
+            .onDisappear {
+                action(.onDisappear)
             }
             .onChange(of: selectedDate) { oldValue, newValue in
                 guard oldValue != newValue else { return assertionFailure() }
@@ -68,8 +83,21 @@ extension HomeStation {
             .onChange(of: state) { _, newValue in
                 withAnimation { isLoading = newValue == .loading }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                action(.request(date: Date()))
+            .onReceive(
+                Publishers.Merge(
+                    NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification),
+                    NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
+            )) { notification in
+                switch notification.name {
+                case UIApplication.didEnterBackgroundNotification:
+                    action(.onDisappear)
+                case UIApplication.willEnterForegroundNotification:
+                    selectedDate = Date()
+                    action(.request(date: selectedDate))
+                default:
+                    assertionFailure("not implemented")
+                    break
+                }
             }
         }
         

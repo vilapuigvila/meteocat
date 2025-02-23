@@ -11,15 +11,9 @@ import FoundationXML // Necessary for XML parsing on certain platforms
 #endif
 import `SwiftSoup` // Add SwiftSoup for HTML parsing
 
-struct StationModel: Decodable, Hashable, Sendable {
-    let name: String
-    let key: String
-    let value: String
-    let date: String?
-}
-
 struct Requester {
-    static func requestStation(code: String, date: Date? = nil) async throws -> [StationModel] {
+    
+    static func requestStation(code: String, date: Date? = nil) async throws -> [DTO.HomeStation] {
         assert(!code.isEmpty)
         
         let currentDate = date ?? Date()
@@ -52,7 +46,7 @@ struct Requester {
             guard let table = try document.select("table").first() else {
                 throw NSError(domain: "Invalid HTML structure", code: 0, userInfo: nil)
             }
-            var items: [StationModel] = []
+            var items: [DTO.HomeStation] = []
             
             // Step 5: Select all rows in the table (excluding the header)
             let rows = try table.select("tr")
@@ -70,7 +64,7 @@ struct Requester {
                     
                     // Step 6: Print the title and value in the desired format
                     print("\(title)\t\(value)")
-                    items.append(StationModel(name: stationName, key: title, value: value, date: nil))
+                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, date: nil))
                 }
                 
                 // Extract the title (first column) and value (second column)
@@ -79,7 +73,7 @@ struct Requester {
                     let value = try columns.get(1).text()
                     let value2 = try columns.get(2).text()
                     
-                    items.append(StationModel(name: stationName, key: title, value: value, date: value2))
+                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, date: value2))
                 }
             }
             return items
@@ -89,7 +83,7 @@ struct Requester {
         }
     }
     
-    static func fetchStations() async -> [Station] {
+    static func fetchStations() async -> [DTO.Station] {
         do {
             let data = try await URLSession.shared.data(from: URL(string: "https://www.meteo.cat/observacions/xema")!).0
             guard let html = String(data: data, encoding: .utf8) else {
@@ -105,7 +99,7 @@ struct Requester {
     }
 
     // Function to parse the stations from the HTML using SwiftSoup
-    static func parseStations(from html: String) -> [Station] {
+    static func parseStations(from html: String) -> [DTO.Station] {
         do {
             let doc = try SwiftSoup.parse(html)
             

@@ -6,13 +6,13 @@
 //
 
 import SwiftUI
-import SwiftData
+// import SwiftData
 
 @main
 struct meteocatApp: App {
-    var sharedModelContainer: ModelContainer = {
+    /*var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Model.Station.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -21,12 +21,12 @@ struct meteocatApp: App {
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
-
+    }()*/
+    
     var body: some Scene {
         WindowGroup {
             TabBarView()
         }
-        .modelContainer(sharedModelContainer)
+//        .modelContainer(sharedModelContainer)
     }
 }

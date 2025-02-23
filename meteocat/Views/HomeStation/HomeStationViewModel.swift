@@ -20,16 +20,20 @@ enum StateDomain<T: Equatable & Sendable>: Equatable, Sendable {
 enum HomeStationStateDomain: Equatable, Sendable {
     case idle
     case loading
-    case loaded([StationModel])
+    case loaded([DTO.HomeStation])
     case error(HomeStationInteractorImpl.ErrorReason)
+    
+    var result: [DTO.HomeStation] {
+        guard case .loaded(let result) = self else {
+            return []
+        }
+        return result
+    }
 }
 
 final class HomeStationViewModel: ObservableObject {
-    @Published private(set) var state: HomeStation.ViewState = .idle {
-        didSet {
-            print("\(state)")
-        }
-    }
+    @Published private(set) var state: HomeStation.ViewState = .idle
+//    @Published private(set) var stateV2: ViewState<HomeStation.Representable, HomeStation.ErrorView> = .idle
     
     let stationName: String?
     let interactor: HomeStationInteractorProtocol
@@ -42,9 +46,14 @@ final class HomeStationViewModel: ObservableObject {
     
     func action(_ action: HomeStation.Action) {
         switch action {
-        case .viewAppeared: break
+        case .onAppear:
+            interactor.useCase(.requestStation(date: Date()))
+        case .onDisappear:
+            interactor.useCase(.cancelRequestStation)
         case .request(let date):
             interactor.useCase(.requestStation(date: date))
+        case .selectedHomeStation(let value):
+            break
         }
     }
     private var cancellables: Set<AnyCancellable> = []

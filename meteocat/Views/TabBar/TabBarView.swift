@@ -8,23 +8,39 @@
 import SwiftUI
 
 struct TabBarView: View {
-    @UserDefault(UserPreferencesKey.homeStation.rawValue, defaultValue: nil)
-    var homeStation: Preference.HomeStation?
+    
+    private let databaseManager: DatabaseManagerProtocol = {
+        DatabaseManager.makeShared([
+            Model.StationsList.self
+        ])
+    }()
+    
+    init(homeStation: PREF.HomeStation? = nil) {
+//        UserSettings.homeStation = nil
+    }
     
     var body: some View {
         TabView {
             HomeStationView(
-                viewModel: HomeStationViewModel(stationName: homeStation?.name, interactor: HomeStationInteractorImpl(source: .homeStation))
+                viewModel: HomeStationViewModel(
+                    stationName: nil,
+                    interactor: HomeStationInteractorImpl(source: .homeStation)
+                )
             )
             .tabItem {
                 Image(systemName: "thermometer.variable.and.figure.circle.fill")
                 Text("My Station")
             }
-            StationsContentView()
-                .tabItem {
-                    Image(systemName: "gearshape.fill")
-                    Text("Stations")
-                }
+            
+            StationsListView(
+                viewModel: StationsListViewModel(
+                    interactor: StationsListInteractorImpl(databaseManager: .shared)
+                )
+            )
+            .tabItem {
+                Image(systemName: "gearshape.fill")
+                Text("Stations")
+            }
         }
         .onAppear {
             print(#function)

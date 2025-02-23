@@ -7,27 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		507F0C692D537E9000322649 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507F0C682D537E9000322649 /* Model.swift */; };
 		50EF9FBC2CD3846B0066CAAE /* meteocatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */; };
-		50EF9FC02CD3846B0066CAAE /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FBF2CD3846B0066CAAE /* Item.swift */; };
 		50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC12CD3846D0066CAAE /* Assets.xcassets */; };
 		50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */; };
-		50EF9FCC2CD384860066CAAE /* Requester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FCB2CD384860066CAAE /* Requester.swift */; };
 		50EF9FCF2CD384C60066CAAE /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 50EF9FCE2CD384C60066CAAE /* SwiftSoup */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		507F0C682D537E9000322649 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		50EF9FB82CD3846B0066CAAE /* meteocat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = meteocat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = meteocatApp.swift; sourceTree = "<group>"; };
-		50EF9FBF2CD3846B0066CAAE /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
 		50EF9FC12CD3846D0066CAAE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		50EF9FCB2CD384860066CAAE /* Requester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Requester.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		501BA3EB2D6A32D60052F40B /* Model */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Model; sourceTree = "<group>"; };
+		501BA3EC2D6A32F10052F40B /* Network */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Network; sourceTree = "<group>"; };
 		507F0C662D537DB100322649 /* Components */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Components; sourceTree = "<group>"; };
+		50AFCF182D6B742100B47404 /* DTO */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = DTO; sourceTree = "<group>"; };
 		50EA91502D54FC4900E22B0A /* Helpers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Helpers; sourceTree = "<group>"; };
 		50EA91562D550E7C00E22B0A /* UserPreferences */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = UserPreferences; sourceTree = "<group>"; };
 		50F89E3C2D52036F00F7884F /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
@@ -66,12 +63,12 @@
 			children = (
 				50EF9FC12CD3846D0066CAAE /* Assets.xcassets */,
 				507F0C662D537DB100322649 /* Components */,
+				50AFCF182D6B742100B47404 /* DTO */,
 				50EA91502D54FC4900E22B0A /* Helpers */,
-				50EF9FBF2CD3846B0066CAAE /* Item.swift */,
 				50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */,
-				507F0C682D537E9000322649 /* Model.swift */,
+				501BA3EB2D6A32D60052F40B /* Model */,
+				501BA3EC2D6A32F10052F40B /* Network */,
 				50EF9FC32CD3846D0066CAAE /* Preview Content */,
-				50EF9FCB2CD384860066CAAE /* Requester.swift */,
 				50EA91562D550E7C00E22B0A /* UserPreferences */,
 				50F89E3C2D52036F00F7884F /* Views */,
 			);
@@ -102,7 +99,10 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				501BA3EB2D6A32D60052F40B /* Model */,
+				501BA3EC2D6A32F10052F40B /* Network */,
 				507F0C662D537DB100322649 /* Components */,
+				50AFCF182D6B742100B47404 /* DTO */,
 				50EA91502D54FC4900E22B0A /* Helpers */,
 				50EA91562D550E7C00E22B0A /* UserPreferences */,
 				50F89E3C2D52036F00F7884F /* Views */,
@@ -168,10 +168,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				50EF9FC02CD3846B0066CAAE /* Item.swift in Sources */,
-				50EF9FCC2CD384860066CAAE /* Requester.swift in Sources */,
 				50EF9FBC2CD3846B0066CAAE /* meteocatApp.swift in Sources */,
-				507F0C692D537E9000322649 /* Model.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -314,6 +311,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -345,6 +343,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -8,6 +8,7 @@
 import Foundation
 
 enum HomeStation: Hashable, Sendable {
+    
     enum ViewState: Hashable, Sendable {
         case idle
         case loading
@@ -21,6 +22,7 @@ enum HomeStation: Hashable, Sendable {
             return result
         }
     }
+    
     struct Representable: Hashable, Sendable {
         let name: String
         let key: String
@@ -32,8 +34,10 @@ enum HomeStation: Hashable, Sendable {
 extension HomeStation {
     
     enum Action: Hashable, Sendable {
-        case viewAppeared
+        case onAppear
+        case onDisappear
         case request(date: Date)
+        case selectedHomeStation(String)
     }
     
     enum ErrorView: Error {
