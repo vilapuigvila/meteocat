@@ -12,6 +12,13 @@ extension DTO {
         let name: String
         let key: String
         let value: String
-        let date: String?
+        let time: String?
+        private(set) var isFavorite: Bool = false
+        
+        func copyWithIsFavorite(_ isFavorite: Bool) -> Self {
+            var copy = self
+            copy.isFavorite = isFavorite
+            return copy
+        }
     }
 }

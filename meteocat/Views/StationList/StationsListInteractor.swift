@@ -62,108 +62,76 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     }
     
     private func requestStations(pullToRefresh: Bool = false) async {
-        guard requestStationsTask == nil else { return }
-
-        if let storedStations = await getStoredStations(), !pullToRefresh {
-            subject.send(StationsListDomain(list: storedStations.asStationsDTO(), isLoading: false))
+        guard requestStationsTask == nil else {
+            return
+        }
+        if let storedStations = await fetchStationsFromDatabase(), !pullToRefresh {
+            subject.send(
+                StationsListDomain(
+                    list: storedStations.map {
+                        DTO.Station(code: $0.code, name: $0.name, type: $0.type, isFavorite: $0.isFavorite)
+                    },
+                    isLoading: false)
+            )
+            print("avp 📊 - stations list updated from db")
         } else {
-            subject.send(.init(list: [], isLoading: true))
             fetchAndStoreStations()
         }
     }
     
     /// Retrieves stored stations if they are not outdated
-    private func getStoredStations() async -> Model.StationsList? {
-        guard let model = await retrieveStation() else { return nil }
-        let isOutdated = Date(timeIntervalSince1970: model.lastUpdated).differenceInSecondsFromNow > 60 * 60 * 24
-        return isOutdated || model.stations.isEmpty ? nil : model
+    private func fetchStationsFromDatabase() async -> [Model.Station]? {
+        do {
+            let stations = try await databaseManager.fetchItems(
+                Model.Station.self,
+                predicate: nil,
+                sortBy: [SortDescriptor(\Model.Station.name, order: .forward)]
+            )
+            if stations.count >= 1 {
+                assert(stations.first?.lastUpdated != nil)
+            }
+            guard let lastUpdated = stations.first?.lastUpdated else {
+                return nil
+            }
+            let isOutdated = Date(timeIntervalSince1970: lastUpdated).differenceInSecondsFromNow > 60 * 60 * 24 * 15 // 15 days
+            return isOutdated ? nil : stations
+        } catch {
+            return nil
+        }
     }
 
     /// Fetches stations from the API and stores them in the database
     private func fetchAndStoreStations() {
+        subject.send(.init(list: [], isLoading: true))
+        
         requestStationsTask = Task { [weak self] in
             let result = await Requester.fetchStations()
+            let sortedStations = result.sorted {
+                $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
+            }
+            self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
             if !result.isEmpty {
-                let sortedStations = result.sorted {
-                    $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
-                }
-                self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
-                await self?.storeInDatabase(sortedStations)
+                await self?.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
             }
             self?.requestStationsTask = nil
+            print("avp 🛜 - stations from api")
         }
     }
-    /*
-    private func requestStations(pullToRefresh: Bool = false) {
-        guard requestStationsTask == nil else {
-            return
-        }
-        let storedStations: Model.Station? = await {
-            guard let model = await retrieveStation() else {
-                return nil
-            }
-            let isOutdated = Date(timeIntervalSince1970: model.lastUpdated).differenceInSecondsFromNow > 60*60*24 ? true : false
-            if isOutdated || model.values.isEmpty {
-                return nil // request refreshed stations
-            }
-            print("avp - Stations from database")
-            return model
-        }()
-        if let storedStations, !pullToRefresh {
-            subject.send(
-                StationsListDomain(
-                    list: storedStations.asStationsDTO(),
-                    isLoading: false
-                )
-            )
-        } else {
-            subject.send(.init(list: [], isLoading: true))
-            
-            requestStationsTask = Task { [weak self] in
-                let result = await Requester.fetchStations()
-                if result.isEmpty {
-                } else {
-                    let sortedStations = result.sorted {
-                        $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
-                    }
-                    self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
-                    await self?.storeInDatabase(sortedStations)
-                }
-                self?.requestStationsTask = nil
-            }
-        }
-    }
-    */
+
     func cancel() {
         requestStationsTask?.cancel()
         requestStationsTask = nil
     }
     
     @MainActor
-    private func retrieveStation() -> Model.StationsList? {
-        do {
-            let stationModel = try databaseManager.fetchItems(Model.StationsList.self)
-            assert(stationModel.count <= 1, "Expected one station")
-            guard let firstStationModel = stationModel.first else {
-                return nil
-            }
-            return firstStationModel
-        } catch {
-            assertionFailure()
-            return nil
-        }
-    }
-    
-    @MainActor
-    private func storeInDatabase(_ stations: [DTO.Station]) {
+    private func refreshStationInDatabase(_ stations: [DTO.Station], timeInterval: TimeInterval) {
         let stations = stations.map {
-            Model.StationsList.Values(code: $0.code, name: $0.name, type: $0.type)
+            Model.Station(code: $0.code, name: $0.name, type: $0.type, lastUpdated: timeInterval)
         }
-        let model = Model.StationsList(stations: stations, lastUpdated: Date().timeIntervalSince1970)
         do {
-            try databaseManager.deleteAll(Model.StationsList.self)
-            try databaseManager.appendItem(item: model)
-            print("avp - Stations updated from network && stored in database")
+            // do transaction
+            try databaseManager.deleteAll(Model.Station.self)
+            try databaseManager.insert(stations)
         } catch {
             assertionFailure(error.localizedDescription)
         }

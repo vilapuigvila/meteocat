@@ -6,36 +6,83 @@
 //
 
 import SwiftUI
+import SwiftData
+
+fileprivate final class FavoriteState: ObservableObject {
+    @Published var isFavorite: Bool
+    
+    init(isFavorite: Bool = false) {
+        self.isFavorite = isFavorite
+    }
+}
 
 struct StationDetaiView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isFavoriteState: Bool = false
     
-    @ObservedObject var viewModel: HomeStationViewModel
+    @StateObject var viewModel: HomeStationViewModel
     
-    let action: () -> Void
+    init(viewModel: HomeStationViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
     
     var body: some View {
-        ZStack {
-            HomeStation.MainView(stationName: "unimplemented", state: viewModel.state) {
-                viewModel.action($0)
-            }
-            Button(action: action) {
-                Image(systemName: "house.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(colorScheme == .dark ? .white : .black)
-                    .frame(width: 24, height: 24)
-                    .padding()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .offset(x: -16)
+        HomeStation.MainView(source: .detail, state: viewModel.stateView) {
+            viewModel.action($0)
+        }
+    }
+    var isFavorite: Bool {
+        viewModel.stateView.representable?.isFavorite ?? false
+    }
+}
+
+#if DEBUG
+import Combine
+
+private extension HomeStationStateDomain {
+    static var empty: Self {
+        .idle
+    }
+}
+private struct InteractorMock: HomeStationInteractorProtocol {
+    var domain: HomeStationStateDomain {
+        subject.value
+    }
+    let subject = CurrentValueSubject<HomeStationStateDomain, Never>(.empty)
+    var publisher: AnyPublisher<HomeStationStateDomain, Never> {
+        subject.eraseToAnyPublisher()
+    }
+    
+    func useCase(_ useCase: HomeStationInteractorImpl.UseCase) {
+        switch useCase {
+        case .requestStation:
+            subject.send(
+                .loaded(
+                    dto: [DTO.HomeStation(name: "Vic", key: "Temp Max", value: "10 C", time: nil, isFavorite: true),
+                         DTO.HomeStation(name: "Vic", key: "Temp Min", value: "2 C", time: nil, isFavorite: true),
+                         DTO.HomeStation(name: "Vic", key: "Temp Mitjana", value: "10.2 C", time: nil, isFavorite: true),
+                         DTO.HomeStation(name: "Vic", key: "Pluja", value: "0.0 mm", time: nil, isFavorite: true)],
+                    stationCode: "",
+                    isHome: false
+                )
+            )
+//            subject.send(.loading)
+        case .addToFavs:
+            break
+        case .addAsHome:
+            break
+        case .cancelRequestStation:
+            break
         }
     }
 }
 
 #Preview {
-    let vm = HomeStationViewModel(stationName: "Oris", interactor: HomeStationInteractorImpl(source: .detailStation(code: "CC")))
-    StationDetaiView(viewModel: vm) {
-        
-    }
+    let vm = HomeStationViewModel(
+        stationName: "CC",
+        interactor: InteractorMock()
+    )
+    StationDetaiView(/*stationCode: "",*/ viewModel: vm)
 }
+#endif
+

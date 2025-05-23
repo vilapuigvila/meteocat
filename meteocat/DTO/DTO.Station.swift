@@ -21,11 +21,13 @@ extension DTO {
         let city: City
         let region: Region
         let states: [State]
+        let isFavorite: Bool
         
         init(
             code: String,
             name: String,
-            type: String
+            type: String,
+            isFavorite: Bool = false
         ) {
             self.code = code
             self.name = name
@@ -36,6 +38,7 @@ extension DTO {
             self.city = City(codi: "", nom: "", slug: "", coordenades: Coordinates(latitude: 0, longitude: 0), comarca: "")
             self.region = Region(codi: 0, nom: "")
             self.states = []
+            self.isFavorite = false
         }
         
         init(from decoder: any Decoder) throws {
@@ -49,6 +52,11 @@ extension DTO {
             self.city = try container.decode(Station.City.self, forKey: .city)
             self.region = try container.decode(Station.Region.self, forKey: .region)
             self.states = try container.decode([Station.State].self, forKey: .states)
+            self.isFavorite = false
+        }
+        
+        func copy(isFavorite: Bool) -> Self {
+            Station(code: code, name: name, type: type, isFavorite: isFavorite)
         }
         
         enum CodingKeys: String, CodingKey {

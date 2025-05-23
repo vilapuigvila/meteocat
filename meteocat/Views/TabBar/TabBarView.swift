@@ -11,21 +11,31 @@ struct TabBarView: View {
     
     private let databaseManager: DatabaseManagerProtocol = {
         DatabaseManager.makeShared([
-            Model.StationsList.self
+            Model.Station.self, Model.InfoStationByDate.self
         ])
     }()
+    private let stationsViewModel: StationsListViewModel
+    private let homeViewModel: HomeStationViewModel
+    private let favsViewModel: FavoritesViewModel
     
     init(homeStation: PREF.HomeStation? = nil) {
-//        UserSettings.homeStation = nil
+        /*
+        let _infos = try? databaseManager.fetchItems(Model.InfoStationByDate.self, predicate: nil, sortBy: nil)
+        print("avp [DB] 🚀 on App start total infos - \(_infos?.count ?? -99)")*/
+        homeViewModel = HomeStationViewModel(
+            stationName: nil,
+            interactor: HomeStationInteractorImpl(source: .homeStation, databaseManager: .shared)
+        )
+        stationsViewModel = StationsListViewModel(
+            interactor: StationsListInteractorImpl(databaseManager: .shared)
+        )
+        favsViewModel = FavoritesViewModel(interactor: FavoritesInteractorImpl(databaseManager: .shared))
     }
     
     var body: some View {
         TabView {
             HomeStationView(
-                viewModel: HomeStationViewModel(
-                    stationName: nil,
-                    interactor: HomeStationInteractorImpl(source: .homeStation)
-                )
+                viewModel: homeViewModel
             )
             .tabItem {
                 Image(systemName: "thermometer.variable.and.figure.circle.fill")
@@ -33,13 +43,18 @@ struct TabBarView: View {
             }
             
             StationsListView(
-                viewModel: StationsListViewModel(
-                    interactor: StationsListInteractorImpl(databaseManager: .shared)
-                )
+                viewModel: stationsViewModel
             )
             .tabItem {
                 Image(systemName: "gearshape.fill")
                 Text("Stations")
+            }
+            FavoritesView(
+                viewModel: favsViewModel
+            )
+            .tabItem {
+                Image(systemName: "heart.fill")
+                Text("Favs")
             }
         }
         .onAppear {

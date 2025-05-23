@@ -11,40 +11,29 @@ import SwiftData
 extension Model {
     
     @Model
-    final class HomeStation {
-        /*
-         struct HomeStation: Decodable, Hashable {
-             let name: String
-             let key: String
-             let value: String
-             let date: String?
-         }
-         */
-        
-        struct Values: Equatable, Codable {
+    final class InfoStationByDate {
+        struct Day: Equatable, Codable {
             let name: String
             let key: String
             let value: String
-            let date: String?
+            let time: String?
             
-            init(name: String, key: String, value: String, date: String?) {
+            init(name: String, key: String, value: String, time: String?) {
                 self.name = name
                 self.key = key
                 self.value = value
-                self.date = date
+                self.time = time
             }
         }
-
-        private(set)var values: [Values]
-        private(set)var lastUpdated: TimeInterval
         
-        init (values: [Values], lastUpdated: TimeInterval) {
+        private(set)var values: [Day]
+        private(set)var createdAt: TimeInterval
+        private(set) var station: Station?
+        
+        init(values: [Day], createdAt: TimeInterval, station: Station) {
             self.values = values
-            self.lastUpdated = lastUpdated
+            self.createdAt = createdAt
+            self.station = station
         }
-        
-//        func asStationsDTO() -> [DTO.Station] {
-//            values.map { DTO.Station(code: $0.code, name: $0.name, type: $0.type) }
-//        }
     }
 }

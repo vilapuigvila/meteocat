@@ -28,13 +28,15 @@ extension StationsList {
         @State private var selectedStation: DTO.Station?
         @State private var isPresentedDetail = false
         @State private var isPullToRefresh = false
-#warning("avp check it out ⚠️ -> .navigationTitle(Estacions) comes from top after pull to refresh")
+//        @State private var path: [] = []
+
+// "avp check it out ⚠️ -> .navigationTitle(Estacions) comes from top after pull to refresh"
         var body: some View {
             NavigationStack {
                 if viewModel.state == .loading {
                     Text("loading")
                         .opacity(isPullToRefresh ? 1 : 0)
-                        .animation(.easeInOut(duration: 0.4), value: isPullToRefresh)
+//                        .animation(.easeInOut(duration: 0.4), value: isPullToRefresh)
                 } else {
                     ListView(
                         viewModel,
@@ -47,7 +49,10 @@ extension StationsList {
                     .navigationTitle("Estacions")
                     .navigationDestination(isPresented: $isPresentedDetail) {
                         if let selectedStation {
-                            buildDetailView(stationCode: selectedStation.code, stationName: selectedStation.name)
+                            buildDetailView(
+                                stationCode: selectedStation.code,
+                                stationName: selectedStation.name
+                            )
                         } else {
                             Text("Something went wrong")
                         }
@@ -59,6 +64,7 @@ extension StationsList {
                 viewModel.action(.onAppear)
             }
             .onDisappear {
+//                selectedStation = nil
                 viewModel.action(.onDisappear)
             }
             .onChange(of: viewModel.state) {
@@ -69,11 +75,9 @@ extension StationsList {
         private func buildDetailView(stationCode: String, stationName: String) -> some View {
             let viewModel = HomeStationViewModel(
                 stationName: stationName,
-                interactor: HomeStationInteractorImpl(source: .detailStation(code: stationCode))
+                interactor: HomeStationInteractorImpl(source: .detailStation(code: stationCode), databaseManager: .shared)
             )
-            return StationDetaiView(viewModel: viewModel) {
-                UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode)
-            }
+            return StationDetaiView(/*stationCode: stationCode, */viewModel: viewModel)
         }
     }
     

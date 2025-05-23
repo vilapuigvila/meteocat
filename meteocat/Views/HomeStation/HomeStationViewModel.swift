@@ -20,22 +20,58 @@ enum StateDomain<T: Equatable & Sendable>: Equatable, Sendable {
 enum HomeStationStateDomain: Equatable, Sendable {
     case idle
     case loading
-    case loaded([DTO.HomeStation])
+    case loaded(dto: [DTO.HomeStation], stationCode: String, isHome: Bool)
     case error(HomeStationInteractorImpl.ErrorReason)
     
     var result: [DTO.HomeStation] {
-        guard case .loaded(let result) = self else {
+        guard case .loaded(let dto, _, _) = self else {
             return []
         }
-        return result
+        return dto
+    }
+    var stationCode: String {
+        if case .loaded(_, let code, _) = self {
+            return code
+        } else {
+            assertionFailure()
+            return ""
+        }
+    }
+    var isHome: Bool {
+        if case .loaded(_, _, let isHome) = self {
+            return isHome
+        } else {
+            assertionFailure()
+            return false
+        }
+    }
+    var isFavorite: Bool {
+        if case .loaded(let dto, _, _) = self {
+            return dto.first?.isFavorite ?? false
+        } else {
+            assertionFailure()
+            return false
+        }
+    }
+    func copy(isHome: Bool? = nil, isFavorite: Bool? = nil) -> Self {
+        .loaded(
+            dto: result.map {
+                DTO.HomeStation(
+                    name: $0.name,
+                    key: $0.key,
+                    value: $0.value, time: $0.time, isFavorite: isFavorite ?? self.isFavorite)
+            },
+            stationCode: stationCode,
+            isHome: isHome ?? self.isHome
+        )
     }
 }
 
 final class HomeStationViewModel: ObservableObject {
-    @Published private(set) var state: HomeStation.ViewState = .idle
+    @Published private(set) var stateView: HomeStation.ViewState = .idle
 //    @Published private(set) var stateV2: ViewState<HomeStation.Representable, HomeStation.ErrorView> = .idle
     
-    let stationName: String?
+    var stationName: String?
     let interactor: HomeStationInteractorProtocol
     
     init(stationName: String?, interactor: HomeStationInteractorProtocol) {
@@ -52,8 +88,10 @@ final class HomeStationViewModel: ObservableObject {
             interactor.useCase(.cancelRequestStation)
         case .request(let date):
             interactor.useCase(.requestStation(date: date))
-        case .selectedHomeStation(let value):
-            break
+        case .addToFavs(let stationCode, let isFav):
+            interactor.useCase(.addToFavs(code: stationCode, isFavorite: isFav))
+        case .addAsHome(let stationName, let code):
+            interactor.useCase(.addAsHome(stationName: stationName, stationCode: code))
         }
     }
     private var cancellables: Set<AnyCancellable> = []
@@ -63,7 +101,7 @@ final class HomeStationViewModel: ObservableObject {
             .publisher
             .receive(on: DispatchQueue.main)
             .map(mapToHomeStationState)
-            .weakAssign(to: \.state, on: self)
+            .weakAssign(to: \.stateView, on: self)
             .store(in: &cancellables)
     }
     
@@ -73,11 +111,19 @@ final class HomeStationViewModel: ObservableObject {
             return .idle
         case .loading:
             return .loading
-        case .loaded(let representable):
+        case .loaded(let representable, let stationCode, let isHome):
+            print("avvp [HOME STATION VM] - \(dump(representable))")
+            let values = representable.map {
+                HomeStation.Representable.Values(key: $0.key, value: $0.value, time: $0.time)
+            }
             return .loaded(
-                representable.map {
-                    HomeStation.Representable(name: $0.name, key: $0.key, value: $0.value, date: $0.date)
-                }
+                HomeStation.Representable(
+                    values: values,
+                    name: representable.first?.name ?? "",
+                    code: stationCode,
+                    isFavorite: representable.first?.isFavorite ?? false,
+                    isHome: isHome
+                )
             )
         case .error(let error):
             return .error(error.asHomeStationErrorView())

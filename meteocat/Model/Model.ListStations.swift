@@ -11,29 +11,24 @@ import SwiftData
 extension Model {
     
     @Model
-    final class StationsList {
+    final class Station {
+        var id: String { code }
         
-        struct Values: Equatable, Codable {
-            let code: String
-            let name: String
-            let type: String
-            init(code: String, name: String, type: String) {
-                self.code = code
-                self.name = name
-                self.type = type
-            }
-        }
-
-        private(set)var stations: [Values]
+        private(set) var code: String
+        private(set) var name: String
+        private(set) var type: String
         private(set)var lastUpdated: TimeInterval
+        private(set)var isFavorite: Bool = false
         
-        init (stations: [Values], lastUpdated: TimeInterval) {
-            self.stations = stations
+        init(code: String, name: String, type: String, lastUpdated: TimeInterval) {
+            self.code = code
+            self.name = name
+            self.type = type
             self.lastUpdated = lastUpdated
         }
         
-        func asStationsDTO() -> [DTO.Station] {
-            stations.map { DTO.Station(code: $0.code, name: $0.name, type: $0.type) }
+        func movedToFavorite(_ value: Bool) {
+            isFavorite = value
         }
     }
 }

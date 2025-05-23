@@ -30,3 +30,4 @@ struct meteocatApp: App {
 //        .modelContainer(sharedModelContainer)
     }
 }
+

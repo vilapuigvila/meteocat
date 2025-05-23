@@ -12,22 +12,33 @@ enum HomeStation: Hashable, Sendable {
     enum ViewState: Hashable, Sendable {
         case idle
         case loading
-        case loaded([Representable])
+        case loaded(Representable)
         case error(ErrorView)
         
-        var result: [Representable] {
+        var values: [Representable.Values] {
             guard case .loaded(let result) = self else {
                 return []
+            }
+            return result.values
+        }
+        var representable: Representable? {
+            guard case .loaded(let result) = self else {
+                return nil
             }
             return result
         }
     }
-    
     struct Representable: Hashable, Sendable {
+        struct Values: Hashable, Sendable {
+            let key: String
+            let value: String
+            let time: String?
+        }
+        let values: [Values]
         let name: String
-        let key: String
-        let value: String
-        let date: String?
+        let code: String
+        let isFavorite: Bool
+        let isHome: Bool
     }
 }
 
@@ -37,7 +48,8 @@ extension HomeStation {
         case onAppear
         case onDisappear
         case request(date: Date)
-        case selectedHomeStation(String)
+        case addToFavs(code: String, isFavorite: Bool)
+        case addAsHome(stationName: String?, code: String?)
     }
     
     enum ErrorView: Error {

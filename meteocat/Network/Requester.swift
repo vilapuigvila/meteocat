@@ -12,78 +12,41 @@ import FoundationXML // Necessary for XML parsing on certain platforms
 import `SwiftSoup` // Add SwiftSoup for HTML parsing
 
 struct Requester {
-    
-    static func requestStation(code: String, date: Date? = nil) async throws -> [DTO.HomeStation] {
-        assert(!code.isEmpty)
-        
-        let currentDate = date ?? Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
-        let formattedDate = formatter.string(from: currentDate)
-        // 2025-02-01T07:00Z
-        let urlString = "https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(formattedDate)"
-        guard let url = URL(string: urlString) else {
-            throw NSError(domain: "Invalid URL", code: 0, userInfo: nil)
-        }
-        
-        do {
-            let data = try await URLSession.shared.data(from: url).0
-            guard let htmlContent = String(data: data, encoding: .utf8) else {
-                throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
-            }
-            let document = try SwiftSoup.parse(htmlContent)
-            
-            let stationName: String = {
-                guard let fitxa = try? document.select("#fitxa-ema").first(),
-                      let value = try? fitxa.select("h2").first()?.text() ?? "not found"
-                else {
-                    return "not found"
-                }
-                return value
-            }()
-            
-            // Step 4: Select the table with the "Resum diari" data (the first <table> element)
-            guard let table = try document.select("table").first() else {
-                throw NSError(domain: "Invalid HTML structure", code: 0, userInfo: nil)
-            }
-            var items: [DTO.HomeStation] = []
-            
-            // Step 5: Select all rows in the table (excluding the header)
-            let rows = try table.select("tr")
-            
-            for row in rows {
-                // Get the columns (either <th> for title or <td> for values)
-                let columns = try row.select("th, td")
-                
-                // Skip rows with no useful data
-                if columns.isEmpty() { continue }
-
-                if columns.size() == 2 {
-                    let title = try columns.get(0).text()
-                    let value = try columns.get(1).text()
-                    
-                    // Step 6: Print the title and value in the desired format
-                    print("\(title)\t\(value)")
-                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, date: nil))
-                }
-                
-                // Extract the title (first column) and value (second column)
-                if columns.size() == 3 {
-                    let title = try columns.get(0).text()
-                    let value = try columns.get(1).text()
-                    let value2 = try columns.get(2).text()
-                    
-                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, date: value2))
-                }
-            }
-            return items
-        } catch {
-            assertionFailure()
-            throw error
-        }
+    enum ErrorReason: Error {
+        case urlCreationFailed
     }
     
+    private static let token = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
+    
+    static func requester(_ urlString: String) async throws -> (Data, URLResponse) {
+        guard let url = URL(string: urlString) else {
+            assertionFailure()
+            throw ErrorReason.urlCreationFailed
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET" // or "POST", etc.
+
+        request.setValue(token, forHTTPHeaderField: "x-api-key")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let result = try await URLSession.shared.data(for: request)
+        return result
+    }
+    
+    /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    // MARK: - Requests -
+    /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    
     static func fetchStations() async -> [DTO.Station] {
+        /*
+        do {
+            let result = try await request("https://api.meteo.cat/xema/v1/estacions/metadades")
+            print("avpv - \(result)")
+            return []
+        } catch {
+            print("avpv - \(error.localizedDescription)")
+            return []
+        }*/
+        
         do {
             let data = try await URLSession.shared.data(from: URL(string: "https://www.meteo.cat/observacions/xema")!).0
             guard let html = String(data: data, encoding: .utf8) else {
@@ -144,5 +107,96 @@ struct Requester {
             assertionFailure()
             return []
         }
+    }
+}
+
+/// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// MARK: - Station Request -
+/// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+extension Requester {
+    
+    static func requestStation(code: String, date: Date? = nil) async throws -> [DTO.HomeStation] {
+        assert(!code.isEmpty)
+        
+//        let currentDate = date ?? Date()
+//        let formatter = DateFormatter()
+//        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+        
+        // 2025-02-01T07:00Z
+        let formattedDate = dateFormatterForRequestStation(date)
+        let urlString = "https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(formattedDate)"
+        guard let url = URL(string: urlString) else {
+            throw NSError(domain: "Invalid URL", code: 0, userInfo: nil)
+        }
+        
+        do {
+            let data = try await URLSession.shared.data(from: url).0
+            guard let htmlContent = String(data: data, encoding: .utf8) else {
+                throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
+            }
+            let document = try SwiftSoup.parse(htmlContent)
+            
+            let stationName: String = {
+                guard let fitxa = try? document.select("#fitxa-ema").first(),
+                      let value = try? fitxa.select("h2").first()?.text() ?? "not found"
+                else {
+                    return "not found"
+                }
+                return value
+            }()
+            
+            // Step 4: Select the table with the "Resum diari" data (the first <table> element)
+            guard let table = try document.select("table").first() else {
+                throw NSError(domain: "Invalid HTML structure", code: 0, userInfo: nil)
+            }
+            var items: [DTO.HomeStation] = []
+            
+            // Step 5: Select all rows in the table (excluding the header)
+            let rows = try table.select("tr")
+            
+            for row in rows {
+                // Get the columns (either <th> for title or <td> for values)
+                let columns = try row.select("th, td")
+                
+                // Skip rows with no useful data
+                if columns.isEmpty() { continue }
+
+                if columns.size() == 2 {
+                    let title = try columns.get(0).text()
+                    let value = try columns.get(1).text()
+                    
+                    // Step 6: Print the title and value in the desired format
+//                    print("\(title)\t\(value)")
+                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: nil))
+                }
+                
+                // Extract the title (first column) and value (second column)
+                if columns.size() == 3 {
+                    let title = try columns.get(0).text()
+                    let value = try columns.get(1).text()
+                    let value2 = try columns.get(2).text()
+                    
+                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: value2))
+                }
+            }
+            return items
+        } catch {
+            assertionFailure()
+            throw error
+        }
+    }
+}
+
+// MARK: - DateFormatter Helpers -
+
+extension Requester {
+    private static var dateFormatter: DateFormatter = {
+        DateFormatter()
+    }()
+    private static let dateFormatterForRequestStation: (Date?) -> String = { date in
+        let currentDate = date ?? Date()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+        return dateFormatter.string(from: currentDate)
     }
 }
