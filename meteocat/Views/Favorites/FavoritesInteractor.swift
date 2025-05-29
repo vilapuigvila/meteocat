@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import Alfy
 
 struct FavoritesDomain {
     struct FavoriteValue: Identifiable {

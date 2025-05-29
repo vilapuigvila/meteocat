@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import Alfy
 
 protocol HomeStationInteractorProtocol {
     var domain: HomeStationStateDomain { get }
@@ -265,7 +266,7 @@ struct StationWorker {
         date: Date,
         store: Bool
     ) async throws -> [DTO.HomeStation] {
-        let dto: [DTO.HomeStation] = try await Requester.requestStation(code: code, date: date)
+        let dto: [DTO.HomeStation] = try await _Requester.requestStation(code: code, date: date)
         if store {
             await insertInfoDay(database, dto: dto, code: code, forDate: date)
         }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		504ECD3D2DE84CA100C95D80 /* Alfy in Frameworks */ = {isa = PBXBuildFile; productRef = 504ECD3C2DE84CA100C95D80 /* Alfy */; };
 		50EF9FBC2CD3846B0066CAAE /* meteocatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */; };
 		50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC12CD3846D0066CAAE /* Assets.xcassets */; };
 		50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */; };
@@ -35,6 +36,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				504ECD3D2DE84CA100C95D80 /* Alfy in Frameworks */,
 				50EF9FCF2CD384C60066CAAE /* SwiftSoup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -110,6 +112,7 @@
 			name = meteocat;
 			packageProductDependencies = (
 				50EF9FCE2CD384C60066CAAE /* SwiftSoup */,
+				504ECD3C2DE84CA100C95D80 /* Alfy */,
 			);
 			productName = meteocat;
 			productReference = 50EF9FB82CD3846B0066CAAE /* meteocat.app */;
@@ -141,6 +144,7 @@
 			mainGroup = 50EF9FAF2CD3846B0066CAAE;
 			packageReferences = (
 				50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */,
+				504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */,
 			);
 			productRefGroup = 50EF9FB92CD3846B0066CAAE /* Products */;
 			projectDirPath = "";
@@ -382,6 +386,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/vilapuigvila/Alfy.git";
+			requirement = {
+				branch = develop;
+				kind = branch;
+			};
+		};
 		50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/scinfu/SwiftSoup.git";
@@ -393,6 +405,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		504ECD3C2DE84CA100C95D80 /* Alfy */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */;
+			productName = Alfy;
+		};
 		50EF9FCE2CD384C60066CAAE /* SwiftSoup */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 50EF9FCD2CD384C60066CAAE /* XCRemoteSwiftPackageReference "SwiftSoup" */;

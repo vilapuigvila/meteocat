@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Alfy
 
 struct FavoritesView: View {
     
@@ -66,7 +67,7 @@ extension Favorites {
                             stationName: selectedItem.name,
                             interactor: HomeStationInteractorImpl(
                                 source: .detailStation(code: selectedItem.stationCode),
-                                databaseManager: .shared
+                                databaseManager: DatabaseManager.shared
                             )
                         )
                         FavoriteDetailView(viewModel: viewModel)

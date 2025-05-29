@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Alfy
 
 struct TabBarView: View {
     
@@ -24,12 +25,12 @@ struct TabBarView: View {
         print("avp [DB] 🚀 on App start total infos - \(_infos?.count ?? -99)")*/
         homeViewModel = HomeStationViewModel(
             stationName: nil,
-            interactor: HomeStationInteractorImpl(source: .homeStation, databaseManager: .shared)
+            interactor: HomeStationInteractorImpl(source: .homeStation, databaseManager: DatabaseManager.shared)
         )
         stationsViewModel = StationsListViewModel(
-            interactor: StationsListInteractorImpl(databaseManager: .shared)
+            interactor: StationsListInteractorImpl(databaseManager: DatabaseManager.shared)
         )
-        favsViewModel = FavoritesViewModel(interactor: FavoritesInteractorImpl(databaseManager: .shared))
+        favsViewModel = FavoritesViewModel(interactor: FavoritesInteractorImpl(databaseManager: DatabaseManager.shared))
     }
     
     var body: some View {

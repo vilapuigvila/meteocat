@@ -4,7 +4,7 @@
 //
 //  Created by albert vila on 22/2/25.
 //
-
+/*
 import Foundation
 import SwiftData
 
@@ -163,3 +163,4 @@ final class DatabaseManager : DatabaseManagerProtocol {
     }
      */
 }
+*/

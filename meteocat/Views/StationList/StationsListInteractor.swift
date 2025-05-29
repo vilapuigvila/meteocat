@@ -6,17 +6,14 @@
 //
 
 import Foundation
-//import SwiftUICore
-//import SwiftData
-//import _SwiftData_SwiftUI
 import Combine
+import Alfy
 
 struct StationsListDomain {
     static let empty: StationsListDomain = .init(list: [], isLoading: false)
     
     let list: [DTO.Station]
     let isLoading: Bool
-//    let error: EquatableError?
     
     func copy(list: [DTO.Station]? = nil, isLoading: Bool? = nil) -> StationsListDomain {
         .init(list: list ?? self.list, isLoading: isLoading ?? self.isLoading)
@@ -105,7 +102,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         subject.send(.init(list: [], isLoading: true))
         
         requestStationsTask = Task { [weak self] in
-            let result = await Requester.fetchStations()
+            let result = await _Requester.fetchStations()
             let sortedStations = result.sorted {
                 $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
             }

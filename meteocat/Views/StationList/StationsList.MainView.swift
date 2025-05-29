@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Alfy
 
 struct StationsListView: View {
     @ObservedObject private var viewModel: StationsListViewModel
@@ -75,7 +76,10 @@ extension StationsList {
         private func buildDetailView(stationCode: String, stationName: String) -> some View {
             let viewModel = HomeStationViewModel(
                 stationName: stationName,
-                interactor: HomeStationInteractorImpl(source: .detailStation(code: stationCode), databaseManager: .shared)
+                interactor: HomeStationInteractorImpl(
+                    source: .detailStation(code: stationCode),
+                    databaseManager: DatabaseManager.shared
+                )
             )
             return StationDetaiView(/*stationCode: stationCode, */viewModel: viewModel)
         }

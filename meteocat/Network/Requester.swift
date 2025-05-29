@@ -10,14 +10,15 @@ import Foundation
 import FoundationXML // Necessary for XML parsing on certain platforms
 #endif
 import `SwiftSoup` // Add SwiftSoup for HTML parsing
+import Alfy
 
-struct Requester {
+struct _Requester {
     enum ErrorReason: Error {
         case urlCreationFailed
     }
     
-    private static let token = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
-    
+    private static let meteocatToken = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
+    /*
     static func requester(_ urlString: String) async throws -> (Data, URLResponse) {
         guard let url = URL(string: urlString) else {
             assertionFailure()
@@ -26,11 +27,11 @@ struct Requester {
         var request = URLRequest(url: url)
         request.httpMethod = "GET" // or "POST", etc.
 
-        request.setValue(token, forHTTPHeaderField: "x-api-key")
+        request.setValue(meteocatToken, forHTTPHeaderField: "x-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let result = try await URLSession.shared.data(for: request)
         return result
-    }
+    }*/
     
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
     // MARK: - Requests -
@@ -39,9 +40,11 @@ struct Requester {
     static func fetchStations() async -> [DTO.Station] {
         /*
         do {
-            let result = try await request("https://api.meteo.cat/xema/v1/estacions/metadades")
+            let result = try await Requester.request(
+                "https://api.meteo.cat/xema/v1/estacions/metadades",
+                headers: [["x-api-key": meteocatToken]]
+            )
             print("avpv - \(result)")
-            return []
         } catch {
             print("avpv - \(error.localizedDescription)")
             return []
@@ -114,7 +117,7 @@ struct Requester {
 // MARK: - Station Request -
 /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-extension Requester {
+extension _Requester {
     
     static func requestStation(code: String, date: Date? = nil) async throws -> [DTO.HomeStation] {
         assert(!code.isEmpty)
@@ -190,7 +193,7 @@ extension Requester {
 
 // MARK: - DateFormatter Helpers -
 
-extension Requester {
+extension _Requester {
     private static var dateFormatter: DateFormatter = {
         DateFormatter()
     }()
