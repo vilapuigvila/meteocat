@@ -22,3 +22,10 @@ extension DTO {
         }
     }
 }
+
+extension DTO {
+    struct LastTemperature: Decodable, Hashable {
+        let lastTemp: Double
+        let date: String
+    }
+}

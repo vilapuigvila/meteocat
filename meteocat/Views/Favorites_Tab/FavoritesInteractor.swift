@@ -18,10 +18,11 @@ struct FavoritesDomain {
         let code: String
         let isFavorite: Bool
     }
-    static let empty: FavoritesDomain = .init(list: [], isLoading: false)
+    static let empty: FavoritesDomain = .init(list: [], isLoading: false, error: nil)
     
     let list: [FavoriteValue]
     let isLoading: Bool
+    let error: FavoritesInteractorImpl.ErrorReason?
     /*
     func copy(list: [FavoriteValue]? = nil, isLoading: Bool? = nil) -> StationsListDomain {
 //        .init(list: list ?? self.list, isLoading: isLoading ?? self.isLoading)
@@ -63,11 +64,11 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
         }
     }
     
-    private typealias Fav = FavoritesDomain.FavoriteValue
+    fileprivate typealias Fav = FavoritesDomain.FavoriteValue
     
     @MainActor
     private func fetchFavoritesFromData() {
-        subject.send(FavoritesDomain(list: [], isLoading: true))
+        subject.send(FavoritesDomain(list: [], isLoading: true, error: nil))
         
         do {
             let stations = try databaseManager.fetchItems(
@@ -79,29 +80,46 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                 DTO.Station(code: $0.code, name: $0.name, type: $0.type, isFavorite: $0.isFavorite)
             }
             Task {
-                let result: [Fav] = await withTaskGroup(of: Fav?.self) { group in
-                    for fav in favs {
-                        group.addTask {
-                            await self.requestInfoStation(code: fav.code)
+                do {
+                    let result: [Fav] = try await withThrowingTaskGroup(of: Fav?.self) { group in
+                        for fav in favs {
+                            group.addTask {
+                                try await self.requestInfoStation(code: fav.code)
+                            }
+                        }
+                        var favsResult = [Fav]()
+                        favsResult.reserveCapacity(favs.count)
+                        do {
+                            for try await result in group {
+                                guard let fav = result else { continue }
+                                favsResult.append(fav)
+                            }
+                            return favsResult
+                        } catch {
+                            throw error
                         }
                     }
-                    var favsResult = [Fav]()
-                    favsResult.reserveCapacity(favs.count)
-                    for await result in group {
-                        guard let fav = result else { continue }
-                        favsResult.append(fav)
+                    subject.send(FavoritesDomain(list: result, isLoading: false, error: nil))
+                } catch {
+                    let domainError: FavoritesInteractorImpl.ErrorReason
+                    switch error as? Requester.ErrorReason {
+                    case .noInternetConnection:
+                        domainError = .noInternetConnection
+                    case let .some(requesterError):
+                        domainError = .unknown(requesterError.localizedDescription)
+                    default:
+                        domainError = .unknown(error.localizedDescription)
                     }
-                    return favsResult
+                    subject.send(FavoritesDomain(list: [], isLoading: false, error: domainError))
                 }
-                subject.send(FavoritesDomain(list: result, isLoading: false))
             }
         } catch {
-            subject.send(FavoritesDomain(list: [], isLoading: false))
+            subject.send(FavoritesDomain(list: [], isLoading: false, error: .unknown(error.localizedDescription)))
         }
     }
     
     @MainActor
-    private func requestInfoStation(code: String) async -> Fav? {
+    private func requestInfoStation(code: String) async throws -> Fav? {
         if let dto = StationWorker.fetchInfoStation(databaseManager, code: code, date: Date()) {
             return Self.mapStationInfo(dto, code: code)
         }
@@ -109,8 +127,16 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             let dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: Date(), store: true)
             return Self.mapStationInfo(dto, code: code)
         } catch {
-            assertionFailure(error.localizedDescription)
-            return nil
+            if error is Requester.ErrorReason {
+                guard case Requester.ErrorReason.noInternetConnection = error else {
+                    assertionFailure(error.localizedDescription)
+                    return nil
+                }
+                throw ErrorReason.noInternetConnection
+            } else {
+                assertionFailure(error.localizedDescription)
+                return nil
+            }
         }
     }
     
@@ -135,26 +161,6 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     private static func normalized(_ string: String) -> String {
         string.folding(options: .diacriticInsensitive, locale: .current).lowercased()
     }
-    /*
-    private func stationValue(forKey key: String) -> String? {
-        let normalizedKey = Self.normalized(key)
-        switch true {
-        case normalizedKey.contains("temperatura maxima"):
-            return normalizedKey
-        case normalizedKey.contains("temperatura minima"):
-            return normalizedKey
-//        case normalizedKey.contains("humitat"):
-//            return ("humidity.fill")
-//        case normalizedKey.contains("vent"):
-//            return ("wind")
-//        case normalizedKey.contains("pressio atmosferica"):
-//            return nil
-//        case normalizedKey.contains("precipitacio"):
-//            return ("cloud.rain")
-        default:
-            return nil
-        }
-    }*/
 }
 
 extension FavoritesInteractorImpl {
@@ -173,6 +179,7 @@ extension FavoritesInteractorImpl {
         case noData
         case decodingFailed
         case missingCode
+        case noInternetConnection
         case unknown(String)
     }
 }

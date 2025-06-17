@@ -42,6 +42,8 @@ extension Favorites {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(state.result) { item in
                             buildCardView(item)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                .animation(.easeOut(duration: 0.5), value: state.result)
                                 .onTapGesture {
                                     selectedItem = item
                                 }
@@ -61,6 +63,7 @@ extension Favorites {
                 }
                 .sheet(isPresented: $isPresentedSheet, onDismiss: {
                     selectedItem = nil
+                    action(.onAppear)
                 }) {
                     if let selectedItem {
                         let viewModel = HomeStationViewModel(
@@ -89,13 +92,13 @@ extension Favorites {
                     .lineLimit(1)
                 
                 HStack {
-                    Text("Max: " + item.maxTemp)
+                    Text(item.maxTemp)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .font(.custom("Poppins-Bold", size: 12))
                         .foregroundStyle(.red)
                     Spacer()
-                    Text("Min: " + item.minTemp)
+                    Text(item.minTemp)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .font(.custom("Poppins-Bold", size: 12))

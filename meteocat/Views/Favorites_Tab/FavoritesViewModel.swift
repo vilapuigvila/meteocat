@@ -43,7 +43,7 @@ final class FavoritesViewModel: ObservableObject {
             break
         }
     }
-    #warning("avp check it out ⚠️ -> needs max and min temp")
+    
     private func registerPublisher() {
         interactor
             .publisher
@@ -53,15 +53,18 @@ final class FavoritesViewModel: ObservableObject {
                     return .loading
                 } else {
                     return domain.list.isEmpty ? .error(.empty) :
-                        .loaded(domain.list.map {
-                            Favorites.Representable(
-                                name: $0.name,
-                                maxTemp: $0.maxTemp,
-                                minTemp: $0.minTemp,
-                                stationCode: $0.code,
-                                isFAvorite: $0.isFavorite
-                            )
-                        })
+                        .loaded(domain.list
+                            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                            .map {
+                                Favorites.Representable(
+                                    name: $0.name,
+                                    maxTemp: $0.maxTemp,
+                                    minTemp: $0.minTemp,
+                                    stationCode: $0.code,
+                                    isFAvorite: $0.isFavorite
+                                )
+                        }
+                    )
                 }
             }
             .weakAssign(to: \.stateView, on: self)

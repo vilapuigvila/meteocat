@@ -12,46 +12,79 @@ import FoundationXML // Necessary for XML parsing on certain platforms
 import `SwiftSoup` // Add SwiftSoup for HTML parsing
 import Alfy
 
-struct _Requester {
-    enum ErrorReason: Error {
-        case urlCreationFailed
+// DOCU ****
+// https://apidocs.meteocat.gencat.cat/section/referencia-tecnica/operacions/xema/
+// DOCU ****
+
+// max Temp  -> code 40
+// min Temp  -> code 42
+// last Temp -> code 32
+// https://api.meteo.cat/xema/v1/variables/mesurades/40/ultimes\?codiEstacio\=CC
+
+struct ServerData {
+    enum Service {
+        case lastTemperature(forStationCode: String)
+        case stations
+        case requestStation(code: String, date: Date = Date())
+    }
+    static func request<D: Decodable>(_ service: Service) async throws -> D {
+        let decodable: Decodable = try await {
+            switch service {
+            case .lastTemperature(let forStationCode):
+                try await getLastTemperature(forStationCode: forStationCode)
+            case .stations:
+                await fetchStations()
+            case .requestStation(let code, let date):
+                try await requestStation(code: code, date: date)
+            }
+        }()
+        return decodable as! D
     }
     
     private static let meteocatToken = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
-    /*
-    static func requester(_ urlString: String) async throws -> (Data, URLResponse) {
-        guard let url = URL(string: urlString) else {
-            assertionFailure()
-            throw ErrorReason.urlCreationFailed
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET" // or "POST", etc.
-
-        request.setValue(meteocatToken, forHTTPHeaderField: "x-api-key")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let result = try await URLSession.shared.data(for: request)
-        return result
-    }*/
+    private static let xApiKey: Requester.HeaderParam =
+        .custom(headerField: "x-api-key", value: meteocatToken)
     
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
     // MARK: - Requests -
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    
+    static func getLastTemperature(forStationCode stationCode: String) async throws -> DTO.LastTemperature {
+        do {
+            let data = try await Requester.request(
+                "https://api.meteo.cat/xema/v1/variables/mesurades/32/ultimes?codiEstacio=\(stationCode)",
+                headers: [ServerData.xApiKey]
+            ).data
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let lectures = json["lectures"] as? [[String: Any]],
+                  let firstLecture = lectures.first,
+                  let valor = firstLecture["valor"] as? Double
+            else {
+                assertionFailure()
+                throw Requester.ErrorReason.dataCorrupted
+            }
+            return DTO.LastTemperature(lastTemp: valor, date: "")
+        } catch {
+            assertionFailure()
+            throw Requester.ErrorReason.dataCorrupted
+        }
+    }
     
     static func fetchStations() async -> [DTO.Station] {
         /*
         do {
             let result = try await Requester.request(
                 "https://api.meteo.cat/xema/v1/estacions/metadades",
-                headers: [["x-api-key": meteocatToken]]
+                headers: [.custom(headerField: "x-api-key", value: meteocatToken)]
             )
             print("avpv - \(result)")
         } catch {
             print("avpv - \(error.localizedDescription)")
             return []
-        }*/
-        
+        }
+        */
         do {
-            let data = try await URLSession.shared.data(from: URL(string: "https://www.meteo.cat/observacions/xema")!).0
+            let data = try await Requester.request("https://www.meteo.cat/observacions/xema").data
             guard let html = String(data: data, encoding: .utf8) else {
                 assertionFailure()
                 return []
@@ -65,7 +98,7 @@ struct _Requester {
     }
 
     // Function to parse the stations from the HTML using SwiftSoup
-    static func parseStations(from html: String) -> [DTO.Station] {
+    private static func parseStations(from html: String) -> [DTO.Station] {
         do {
             let doc = try SwiftSoup.parse(html)
             
@@ -117,24 +150,31 @@ struct _Requester {
 // MARK: - Station Request -
 /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-extension _Requester {
+extension ServerData {
     
-    static func requestStation(code: String, date: Date? = nil) async throws -> [DTO.HomeStation] {
+    static func requestStation(code: String, date: Date) async throws -> [DTO.HomeStation] {
         assert(!code.isEmpty)
+//        let value = await getLastTemperature(forStationCode: "CC")
+//        print("avpv - \(value)")
         
-//        let currentDate = date ?? Date()
-//        let formatter = DateFormatter()
-//        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+        /*
+        do {
+            let data = try await Requester.request("https://www.meteo.cat/observacions/xema").data
+            guard let htmlContent = String(data: data, encoding: .utf8) else {
+                throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
+            }
+            let document = try SwiftSoup.parse(htmlContent)
+            print("avpv - \(document)")
+        } catch {
+            assertionFailure()
+        }*/
         
-        // 2025-02-01T07:00Z
-        let formattedDate = dateFormatterForRequestStation(date)
-        let urlString = "https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(formattedDate)"
-        guard let url = URL(string: urlString) else {
-            throw NSError(domain: "Invalid URL", code: 0, userInfo: nil)
-        }
+        let formattedDate = dateFormatterForRequestStation(date) // 2025-02-01T07:00Z
         
         do {
-            let data = try await URLSession.shared.data(from: url).0
+            let data = try await Requester
+                .request("https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(formattedDate)")
+                .data
             guard let htmlContent = String(data: data, encoding: .utf8) else {
                 throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
             }
@@ -185,20 +225,32 @@ extension _Requester {
             }
             return items
         } catch {
-            assertionFailure()
-            throw error
+            guard let urlError = error as? URLError else {
+                assertionFailure()
+                throw error
+            }
+            switch urlError.code {
+            case .notConnectedToInternet:
+                throw Requester.ErrorReason.noInternetConnection
+            case .cancelled:
+                assertionFailure()
+                throw Requester.ErrorReason.generic(statusCode: 500)
+            default:
+                assertionFailure()
+                throw Requester.ErrorReason.dataCorrupted
+            }
         }
     }
 }
 
 // MARK: - DateFormatter Helpers -
 
-extension _Requester {
+extension ServerData {
     private static var dateFormatter: DateFormatter = {
         DateFormatter()
     }()
-    private static let dateFormatterForRequestStation: (Date?) -> String = { date in
-        let currentDate = date ?? Date()
+    private static let dateFormatterForRequestStation: (Date) -> String = { date in
+        let currentDate = date
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
         return dateFormatter.string(from: currentDate)
     }

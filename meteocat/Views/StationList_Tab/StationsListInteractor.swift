@@ -102,7 +102,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         subject.send(.init(list: [], isLoading: true))
         
         requestStationsTask = Task { [weak self] in
-            let result = await _Requester.fetchStations()
+            let result = await ServerData.fetchStations()
             let sortedStations = result.sorted {
                 $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
             }

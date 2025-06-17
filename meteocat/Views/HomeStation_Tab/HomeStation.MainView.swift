@@ -82,9 +82,6 @@ extension HomeStation {
                 guard oldValue != newValue else { return assertionFailure() }
                 action(.request(date: newValue))
             }
-//            .onChange(of: state) { _, newValue in
-//                withAnimation { isLoading = newValue == .loading }
-//            }
             .onReceive(
                 Publishers.Merge(
                     NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification),
@@ -240,7 +237,6 @@ extension HomeStation {
             Button {
                 feedbackGenerator(success: !representable.isFavorite)
                 
-                // Trigger spark effect
                 showSparks = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     showSparks = false
@@ -258,7 +254,7 @@ extension HomeStation {
                         .padding(.horizontal, 4)
                         .animation(.spring(), value: representable.isFavorite)
                     
-                    if showSparks, source == .modal {
+                    if showSparks, source != .home {
                         SparkView(isAddinng: !representable.isFavorite)
                             .frame(width: 24, height: 24)
                             .allowsHitTesting(false)

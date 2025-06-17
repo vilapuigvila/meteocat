@@ -68,8 +68,12 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                         )
                         self.subject.send(.loaded(dto: dto, stationCode: code, isHome: self.isHomeStation))
                     } catch {
-                        assertionFailure(error.localizedDescription)
-                        self.subject.send(.error(.unknown(error.localizedDescription)))
+                        if error is Requester.ErrorReason {
+                            self.subject.send(.error(.unknown(error.localizedDescription)))
+                        } else {
+                            assertionFailure(error.localizedDescription)
+                            self.subject.send(.error(.unknown(error.localizedDescription)))
+                        }
                     }
                 }
             }
@@ -251,6 +255,7 @@ extension HomeStationInteractorImpl {
         case decodingFailed
         case missingCode
         case unknown(String)
+        case noInternetConnection
         
         func asHomeStationErrorView() -> HomeStation.ErrorView {
             HomeStation.ErrorView(stationInteractorError: self)
@@ -266,7 +271,7 @@ struct StationWorker {
         date: Date,
         store: Bool
     ) async throws -> [DTO.HomeStation] {
-        let dto: [DTO.HomeStation] = try await _Requester.requestStation(code: code, date: date)
+        let dto: [DTO.HomeStation] = try await ServerData.requestStation(code: code, date: date)
         if store {
             await insertInfoDay(database, dto: dto, code: code, forDate: date)
         }
