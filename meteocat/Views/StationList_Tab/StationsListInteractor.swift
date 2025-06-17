@@ -77,9 +77,10 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     }
     
     /// Retrieves stored stations if they are not outdated
+    @MainActor
     private func fetchStationsFromDatabase() async -> [Model.Station]? {
         do {
-            let stations = try await databaseManager.fetchItems(
+            let stations = try databaseManager.fetchItems(
                 Model.Station.self,
                 predicate: nil,
                 sortBy: [SortDescriptor(\Model.Station.name, order: .forward)]
