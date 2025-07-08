@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
-// import SwiftData
+import Alfy
+import SDWebImage
+import SDWebImageSVGCoder
 
 @main
 struct meteocatApp: App {
@@ -23,6 +25,11 @@ struct meteocatApp: App {
         }
     }()*/
     
+    init() {
+        let svgCoder = SDImageSVGCoder.shared
+        SDImageCodersManager.shared.addCoder(svgCoder)
+    }
+    
     var body: some Scene {
         WindowGroup {
             TabBarView()
@@ -30,4 +37,3 @@ struct meteocatApp: App {
 //        .modelContainer(sharedModelContainer)
     }
 }
-

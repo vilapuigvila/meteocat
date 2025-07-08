@@ -26,6 +26,7 @@ struct ServerData {
         case lastTemperature(forStationCode: String)
         case stations
         case requestStation(code: String, date: Date = Date())
+        case curentWeather(code: String)
     }
     static func request<D: Decodable>(_ service: Service) async throws -> D {
         let decodable: Decodable = try await {
@@ -36,6 +37,8 @@ struct ServerData {
                 await fetchStations()
             case .requestStation(let code, let date):
                 try await requestStation(code: code, date: date)
+            case .curentWeather(let code):
+                try await getCurrentWeather(code: code)
             }
         }()
         return decodable as! D
@@ -48,6 +51,113 @@ struct ServerData {
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
     // MARK: - Requests -
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    ///
+    
+    private static func getCurrentWeather(code: String) async throws -> DTO.CurrentWeather {
+        let data = try await Requester.request("https://m.meteo.cat/?codi=\(code)").data
+        guard let html = String(data: data, encoding: .utf8) else {
+            assertionFailure()
+            throw Requester.ErrorReason.dataCorrupted
+        }
+        do {
+            let doc = try SwiftSoup.parse(html)
+            guard let tempDiv = try? doc.select("div.temp").first() else {
+                throw Requester.ErrorReason.dataCorrupted
+            }
+            let currentTemp = tempDiv.getChildNodes()
+                 .compactMap({ $0 as? TextNode })
+                 .map({ $0.text().trimmingCharacters(in: .whitespacesAndNewlines) })
+                 .first(where: { !$0.isEmpty })
+            let (tmax, tmin): (String?, String?) = {
+                guard let textremDiv = try? doc.select("div.textrem").first() else {
+                    return (nil, nil)
+                }
+
+                let max = try? textremDiv.select("span.tmax").first()?.text()
+                let min = try? textremDiv.select("span.tmin").first()?.text()
+                return (max, min)
+            }()
+            let (humidity, rain, pressure, wind): (String?, String?, String?, String?) = {
+                guard let table = try? doc.select("section.variables table").first() else {
+                    return (nil, nil, nil, nil)
+                }
+
+                let rows = try? table.select("tr")
+                var humidity: String?
+                var rain: String?
+                var preassure: String?
+                var wind: String?
+
+                rows?.forEach { row in
+                    let th = try? row.select("th").text()
+                    let value = try? row.select("td").text().trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    switch th {
+                    case "Humitat relativa":
+                        humidity = value
+                    case _ where th?.contains("Precipitació") == true:
+                        rain = value
+                    case _ where th?.contains("Pressió atmosfèrica") == true:
+                        preassure = value
+                    case "Vent":
+                        wind = value
+                    default:
+                        break
+                    }
+                }
+
+                return (humidity, rain, preassure, wind)
+            }()
+            let desc: String? = {
+                try? doc.select("div.descripcio").first()?.text()
+            }()
+            let iconWeatherURL: URL? = {
+                guard let meteorDiv = try? doc.select("div.meteor").first(),
+                   let imgElement = try? meteorDiv.select("img").first(),
+                   let src = try? imgElement.attr("src")
+                else {
+                    return nil
+                }
+                return URL(string: src)
+            }()
+            let (station, time, dateTime): (String?, String?, String?) = {
+                guard let div = try? doc.select("div.fontdades").first(),
+                      let abbr = try? div.select("abbr").first()?.text(),
+                      let time = try? div.select("time").first()?.text(),
+                      let sheetText = try? div.text()
+                else {
+                    return (nil, nil, nil)
+                }
+                let station = sheetText
+                    .replacingOccurrences(of: abbr, with: "")
+                    .replacingOccurrences(of: time, with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let datetime = try? div.select("time").first()?.attr("datetime")
+                
+                return (station, time, datetime)
+            }()
+            return DTO.CurrentWeather(
+                now: DTO.CurrentWeather.Now(
+                    currentTemp: currentTemp,
+                    maxTemp: tmax,
+                    minTemp: tmin,
+                    weatherDescription: desc,
+                    iconWeather: iconWeatherURL
+                ),
+                source: DTO.CurrentWeather.Source(
+                    station: station,
+                    time: time,
+                    datetime: dateTime
+                ),
+                humidity: humidity,
+                rain: rain,
+                pressure: pressure,
+                wind: wind
+            )
+        } catch {
+            throw error
+        }
+    }
     
     static func getLastTemperature(forStationCode stationCode: String) async throws -> DTO.LastTemperature {
         do {
@@ -225,19 +335,23 @@ extension ServerData {
             }
             return items
         } catch {
-            guard let urlError = error as? URLError else {
-                assertionFailure()
+            if error is Requester.ErrorReason {
                 throw error
-            }
-            switch urlError.code {
-            case .notConnectedToInternet:
-                throw Requester.ErrorReason.noInternetConnection
-            case .cancelled:
-                assertionFailure()
-                throw Requester.ErrorReason.generic(statusCode: 500)
-            default:
-                assertionFailure()
-                throw Requester.ErrorReason.dataCorrupted
+            } else {
+                guard let urlError = error as? URLError else {
+                    assertionFailure()
+                    throw error
+                }
+                switch urlError.code {
+                case .notConnectedToInternet:
+                    throw Requester.ErrorReason.noInternetConnection
+                case .cancelled:
+                    assertionFailure()
+                    throw Requester.ErrorReason.generic(statusCode: 500)
+                default:
+                    assertionFailure()
+                    throw Requester.ErrorReason.dataCorrupted
+                }
             }
         }
     }

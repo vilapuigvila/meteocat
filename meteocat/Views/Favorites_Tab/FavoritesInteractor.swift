@@ -15,6 +15,7 @@ struct FavoritesDomain {
         let name: String
         let maxTemp: String
         let minTemp: String
+        let rainAcc: String
         let code: String
         let isFavorite: Bool
     }
@@ -26,7 +27,7 @@ struct FavoritesDomain {
     /*
     func copy(list: [FavoriteValue]? = nil, isLoading: Bool? = nil) -> StationsListDomain {
 //        .init(list: list ?? self.list, isLoading: isLoading ?? self.isLoading)
-    }*/
+    }*/ 
 }
 
 protocol FavoritesInteractorProtocol {
@@ -68,7 +69,7 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     
     @MainActor
     private func fetchFavoritesFromData() {
-        subject.send(FavoritesDomain(list: [], isLoading: true, error: nil))
+        subject.send(FavoritesDomain(list: domain.list, isLoading: true, error: nil))
         
         do {
             let stations = try databaseManager.fetchItems(
@@ -132,7 +133,7 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                     assertionFailure(error.localizedDescription)
                     return nil
                 }
-                throw ErrorReason.noInternetConnection
+                throw Requester.ErrorReason.noInternetConnection
             } else {
                 assertionFailure(error.localizedDescription)
                 return nil
@@ -155,7 +156,20 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             }
             return min.value
         }()
-        return Fav(name: dto.first?.name ?? "", maxTemp: maxTemp, minTemp: minTemp, code: code, isFavorite: true)
+        let rain: String = {
+            guard let value = dto.first(where: { Self.normalized($0.key).contains("precipitacio acumulada") })?.value else {
+                return "--"
+            }
+            return value.contains("0.0") ? "--" : value
+        }()
+        return Fav(
+            name: dto.first?.name ?? "",
+            maxTemp: maxTemp,
+            minTemp: minTemp,
+            rainAcc: rain,
+            code: code,
+            isFavorite: true
+        )
     }
     
     private static func normalized(_ string: String) -> String {

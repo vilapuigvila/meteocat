@@ -33,6 +33,7 @@ extension HomeStation {
         @State private var isDatePickerVisible = true
         @State private var isLoading = false
         @State private var hasAppeared = false
+        @State private var _stateView: HomeStation.ViewState = .idle
         
         let source: Source
         let state: HomeStation.ViewState
@@ -40,38 +41,32 @@ extension HomeStation {
         
         var body: some View {
             ZStack {
-                switch state {
-                case .error(let errorView):
-                    switch errorView {
+                if case .error(let kind) = state {
+                    switch kind {
                     case .missingStationCode:
-                        Text("Please select a station from the list.")
+                        MissingStationErrorView()
+                            .transition(.opacity)   
                     case .networkFailure:
-                        Text("Network Error")
-                    }
-                case .idle:
-                    EmptyView()
-                case .loading:
-                    Text("Loading...")
-                case .loaded(let representable):
-                    VStack {
-                        List {
-                            Section(header: buildHeaderView(representable)) {
-                                ForEach(representable.values.indices, id: \.self) { idx in
-                                    let item = representable.values[idx]
-                                    buildRow(
-                                        key: item.key,
-                                        value: item.value,
-                                        time: item.time,
-                                        idx: idx
-                                    )
-                                    .padding([.top, .bottom], 12)
-                                }
-                            }
-                        }
-                        .listRowSeparator(.visible)
+                        NetworkFailureErrorView()
+                            .transition(.opacity)
                     }
                 }
+                if case .idle = state {
+                  EmptyView()
+                    .transition(.opacity)
+                }
+                if case .loading = state {
+                    WeatherLoader()
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                }
+                if case .loaded(let representable) = state {
+                    buildListView(representable)
+//                      .transition(.move(edge: .top).combined(with: .opacity))
+                }
+#warning("avpv check it out ⚠️ -> floating button for current weather ")
+//                Text("blabbal")
             }
+            .animation(.easeInOut(duration: 0.5), value: state)
             .onAppear {
                 action(.onAppear)
             }
@@ -82,20 +77,13 @@ extension HomeStation {
                 guard oldValue != newValue else { return assertionFailure() }
                 action(.request(date: newValue))
             }
-            .onReceive(
-                Publishers.Merge(
-                    NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification),
-                    NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
-            )) { notification in
-                switch notification.name {
-                case UIApplication.didEnterBackgroundNotification:
+            .onAppLifecycleEvent { lifeCycle in
+                switch lifeCycle {
+                case .didEnterBackground:
                     action(.onDisappear)
-                case UIApplication.willEnterForegroundNotification:
+                case .willEnterForeground(let date):
                     selectedDate = Date()
                     action(.request(date: selectedDate))
-                default:
-                    assertionFailure("not implemented")
-                    break
                 }
             }
         }
@@ -104,6 +92,25 @@ extension HomeStation {
             return name.isEmpty
         }
         
+        private func buildListView(_ representable: HomeStation.Representable) -> some View {
+            VStack {
+                List {
+                    Section(header: buildHeaderView(representable)) {
+                        ForEach(representable.values.indices, id: \.self) { idx in
+                            let item = representable.values[idx]
+                            buildRow(
+                                key: item.key,
+                                value: item.value,
+                                time: item.time,
+                                idx: idx
+                            )
+                            .padding([.top, .bottom], 12)
+                        }
+                    }
+                }
+                .listRowSeparator(.visible)
+            }
+        }
         private func buildHeaderTitle(_ representable: HomeStation.Representable) -> some View {
             HStack {
                 switch source {
@@ -186,8 +193,8 @@ extension HomeStation {
                 .padding(.bottom, 20)
                 .id(selectedDate.timeIntervalSince1970)
                 
-                SafariProgressBar(isLoading: $isLoading)
-                    .frame(height: 4)
+//                SafariProgressBar()
+//                    .frame(height: 4)
             }
             .frame(maxWidth: .infinity)
         }

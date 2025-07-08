@@ -7,21 +7,7 @@
 
 import Foundation
 import Combine
-
-/*
-enum FavoritesStateDomain: Equatable {
-    case idle
-    case loading
-    case loaded([DTO.HomeStation])
-    case error(EquatableError)
-    
-    var result: [DTO.HomeStation] {
-        guard case .loaded(let result) = self else {
-            return []
-        }
-        return result
-    }
-}*/
+import Alfy
 
 final class FavoritesViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
@@ -51,6 +37,8 @@ final class FavoritesViewModel: ObservableObject {
             .map { domain in
                 if domain.isLoading {
                     return .loading
+                } else if domain.error != nil {
+                    return .error(.networkFailure)
                 } else {
                     return domain.list.isEmpty ? .error(.empty) :
                         .loaded(domain.list
@@ -60,6 +48,7 @@ final class FavoritesViewModel: ObservableObject {
                                     name: $0.name,
                                     maxTemp: $0.maxTemp,
                                     minTemp: $0.minTemp,
+                                    rainAcc: $0.rainAcc,
                                     stationCode: $0.code,
                                     isFAvorite: $0.isFavorite
                                 )

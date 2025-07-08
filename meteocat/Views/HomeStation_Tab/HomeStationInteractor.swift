@@ -52,15 +52,11 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             }
             Task { @MainActor [weak self] in
                 guard let self else { assertionFailure(); return }
-                
                 self.subject.send(.loading)
-#warning("avp check it out ⚠️ -> delete")
-                try await Task.sleep(for: .seconds(3.5)) // To simulate loading delay
                 
                 if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: code, date: date) {
                     self.subject.send(.loaded(dto: dto, stationCode: code, isHome: self.isHomeStation))
                 } else {
-                    
                     do {
                         let dto = try await StationWorker.requestInfoStation(
                             self.databaseManager,
