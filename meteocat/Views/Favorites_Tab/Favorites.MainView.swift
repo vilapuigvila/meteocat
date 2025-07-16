@@ -82,10 +82,11 @@ extension Favorites {
                             action(.onAppear)
                         }) {
                             if let selectedItem {
+                                let _ = assertionFailure()
                                 let viewModel = HomeStationViewModel(
                                     stationName: selectedItem.name,
                                     interactor: HomeStationInteractorImpl(
-                                        source: .detailStation(code: selectedItem.stationCode),
+                                        source: .detailStation(code: selectedItem.stationCode, cityCode: ""),
                                         databaseManager: DatabaseManager.shared
                                     )
                                 )

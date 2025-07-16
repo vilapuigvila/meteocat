@@ -52,6 +52,7 @@ extension StationsList {
                         if let selectedStation {
                             buildDetailView(
                                 stationCode: selectedStation.code,
+                                cityCode: selectedStation.city.codi,
                                 stationName: selectedStation.name
                             )
                         } else {
@@ -73,11 +74,11 @@ extension StationsList {
             }
         }
         
-        private func buildDetailView(stationCode: String, stationName: String) -> some View {
+        private func buildDetailView(stationCode: String, cityCode: String, stationName: String) -> some View {
             let viewModel = HomeStationViewModel(
                 stationName: stationName,
                 interactor: HomeStationInteractorImpl(
-                    source: .detailStation(code: stationCode),
+                    source: .detailStation(code: stationCode, cityCode: cityCode),
                     databaseManager: DatabaseManager.shared
                 )
             )

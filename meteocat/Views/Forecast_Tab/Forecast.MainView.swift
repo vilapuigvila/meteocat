@@ -48,14 +48,16 @@ extension Forecast {
                             iconUrl: representable.now.iconWeather
                         )
                         .padding()
-                        .padding(.top, 64)
+                        .padding(.top, 24)
                         
-                        buildList(representable)
+                        Spacer()
+//                        buildList(representable)
                         
                     }
                 }
             }
-            .padding()
+            .cornerRadius(10)
+//            .padding()
             .onAppear { prev in
 #warning("avp check it out ⚠️ -> maybe improve that")
                 print("avpv prev date - \(prev)")
@@ -192,7 +194,7 @@ private struct WeatherSummaryView: View {
                 .foregroundColor(.white.opacity(0.8))
         }
 //        .padding()
-        .background(.black.opacity(0.95))
+//        .background(.black.opacity(0.95))
     }
 }
 

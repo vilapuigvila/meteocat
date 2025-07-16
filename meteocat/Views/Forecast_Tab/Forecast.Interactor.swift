@@ -50,11 +50,21 @@ extension Forecast {
         }
         
         private func getForecastInfo() async {
+            guard let code = UserSettings.homeStation?.codeCity else {
+                assertionFailure()
+                subject.send(
+                    domain.copy(
+                        isLoading: false,
+                        error: ErrorReason.missingCityCode.toEquatableError()
+                    )
+                )
+                return
+            }
             subject.send(domain.copy(isLoading: true))
             
             do {
                 // 082858 good
-                let dto: DTO.CurrentWeather = try await ServerData.request(.curentWeather(code: "081509")) // 081509
+                let dto: DTO.CurrentWeather = try await ServerData.request(.curentWeather(code: code)) // 081509
                 let domain = domain.copy(
                     dto: dto,
                     isLoading: false,
@@ -72,6 +82,10 @@ extension Forecast {
 // MARK: - Domain + UseCase -
 
 extension Forecast {
+    enum ErrorReason: Error {
+        case missingCityCode
+    }
+    
     enum UseCase: Equatable {
         case getCurrentWeather
         case two

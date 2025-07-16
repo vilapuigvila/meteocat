@@ -95,6 +95,7 @@ enum PREF {
     struct HomeStation: Codable, Equatable {
         let name: String
         let code: String
+        let codeCity: String
     }
     
     struct LastRequests: Codable, Hashable {

@@ -180,7 +180,7 @@ struct ServerData {
         }
     }
     
-    static func fetchStations() async -> [DTO.Station] {
+    private static func fetchStations() async -> [DTO.Station] {
         /*
         do {
             let result = try await Requester.request(

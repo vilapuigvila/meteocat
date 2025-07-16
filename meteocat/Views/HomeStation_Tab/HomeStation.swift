@@ -37,6 +37,7 @@ enum HomeStation: Hashable, Sendable {
         let values: [Values]
         let name: String
         let code: String
+        let cityCode: String
         let isFavorite: Bool
         let isHome: Bool
     }
@@ -49,7 +50,8 @@ extension HomeStation {
         case onDisappear
         case request(date: Date)
         case addToFavs(code: String, isFavorite: Bool)
-        case addAsHome(stationName: String?, code: String?)
+        case addAsHome(stationName: String?, code: String?, codeCity: String?)
+        case presentCurrentWeather(stationCode: String)
     }
     
     enum ErrorView: Error {

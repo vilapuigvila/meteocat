@@ -29,6 +29,10 @@ extension HomeStation {
         @Environment(\.colorScheme) private var colorScheme
         @Environment(\.scenePhase) private var scenePhase
         
+        @State private var showCurrentWeather = false {
+            willSet { precondition(source == .home, "Only the ☢️ -> `.home` source supports showing the current weather") }
+        }
+        
         @State private var selectedDate = Date()
         @State private var isDatePickerVisible = true
         @State private var isLoading = false
@@ -61,10 +65,52 @@ extension HomeStation {
                 }
                 if case .loaded(let representable) = state {
                     buildListView(representable)
-//                      .transition(.move(edge: .top).combined(with: .opacity))
+                        .blur(radius: showCurrentWeather ? 0.999 : 0.0)
+                        .animation(.easeInOut(duration: 0.3), value: showCurrentWeather)
+                    
+                    if source == .home {
+//                        Rectangle()
+//                            .fill(.ultraThinMaterial)
+//                            .ignoresSafeArea()
+//                            .opacity(showCurrentWeather ? 0.9 : 0)
+//                            .transition(.opacity)
+//                            .animation(.easeInOut(duration: 0.3), value: showCurrentWeather)
+//                            .onTapGesture {
+//                                showCurrentWeather = false
+//                            }
+                        
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Button {
+                                    //                                action(.presentCurrentWeather(stationCode: ""))
+                                    showCurrentWeather = true
+                                } label: {
+                                    Image(systemName: "cloud.sun.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                        .padding(20)
+                                }
+                                .background(Color.accentColor)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                .padding()
+                            }
+                        }
+                    }
                 }
-#warning("avpv check it out ⚠️ -> floating button for current weather ")
-//                Text("blabbal")
+            }
+            .sheet(isPresented: $showCurrentWeather) {
+                ForecastView(
+                    viewModel: Forecast.ViewModel(
+                        interactor: Forecast.InteractorImpl(databaseManager: DatabaseManager.shared)
+                    )
+                )
+                .presentationDetents([.fraction(0.3)])
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(false)
+                .ignoresSafeArea(edges: .bottom)
             }
             .animation(.easeInOut(duration: 0.5), value: state)
             .onAppear {
@@ -82,7 +128,7 @@ extension HomeStation {
                 case .didEnterBackground:
                     action(.onDisappear)
                 case .willEnterForeground(let date):
-                    selectedDate = Date()
+                    selectedDate = date
                     action(.request(date: selectedDate))
                 }
             }
@@ -278,7 +324,8 @@ extension HomeStation {
                 withAnimation {
                     action(.addAsHome(
                         stationName: representable.isHome ? nil : representable.name,
-                        code: representable.isHome ? nil : representable.code
+                        code: representable.isHome ? nil : representable.code,
+                        codeCity: representable.isHome ? nil : representable.cityCode
                     ))
                 }
             } label: {
@@ -331,7 +378,7 @@ extension HomeStation {
 
 #Preview {
     VStack {
-        HomeStation.MainView(source: .modal, state: .loaded(HomeStation.Representable(
+        HomeStation.MainView(source: .home, state: .loaded(HomeStation.Representable(
             values: [
                 HomeStation.Representable.Values(key: "Temperatura mitjana", value: "10.5", time: nil),
                 HomeStation.Representable.Values(key: "Temperatura maxima", value: "11.5", time: nil),
@@ -342,6 +389,7 @@ extension HomeStation {
             ],
             name: "Orís",
             code: "CC",
+            cityCode: "085121",
             isFavorite: false, isHome: false))) { _ in
                 
             }

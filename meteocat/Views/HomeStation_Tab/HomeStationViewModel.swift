@@ -20,25 +20,33 @@ enum StateDomain<T: Equatable & Sendable>: Equatable, Sendable {
 enum HomeStationStateDomain: Equatable, Sendable {
     case idle
     case loading
-    case loaded(dto: [DTO.HomeStation], stationCode: String, isHome: Bool)
+    case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool)
     case error(HomeStationInteractorImpl.ErrorReason)
     
     var result: [DTO.HomeStation] {
-        guard case .loaded(let dto, _, _) = self else {
+        guard case .loaded(let dto, _, _, _) = self else {
             return []
         }
         return dto
     }
     var stationCode: String {
-        if case .loaded(_, let code, _) = self {
+        if case .loaded(_, let code, _, _) = self {
             return code
         } else {
             assertionFailure()
             return ""
         }
     }
+    var cityCode: String {
+        if case .loaded(_, _, let cityCode, _) = self {
+            return cityCode
+        } else {
+            assertionFailure()
+            return ""
+        }
+    }
     var isHome: Bool {
-        if case .loaded(_, _, let isHome) = self {
+        if case .loaded(_, _, _, let isHome) = self {
             return isHome
         } else {
             assertionFailure()
@@ -46,7 +54,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var isFavorite: Bool {
-        if case .loaded(let dto, _, _) = self {
+        if case .loaded(let dto, _, _, _) = self {
             return dto.first?.isFavorite ?? false
         } else {
             assertionFailure()
@@ -62,6 +70,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
                     value: $0.value, time: $0.time, isFavorite: isFavorite ?? self.isFavorite)
             },
             stationCode: stationCode,
+            cityCode: cityCode,
             isHome: isHome ?? self.isHome
         )
     }
@@ -69,7 +78,6 @@ enum HomeStationStateDomain: Equatable, Sendable {
 
 final class HomeStationViewModel: ObservableObject {
     @Published private(set) var stateView: HomeStation.ViewState = .idle
-//    @Published private(set) var stateV2: ViewState<HomeStation.Representable, HomeStation.ErrorView> = .idle
     
     var stationName: String?
     let interactor: HomeStationInteractorProtocol
@@ -90,8 +98,10 @@ final class HomeStationViewModel: ObservableObject {
             interactor.useCase(.requestStation(date: date))
         case .addToFavs(let stationCode, let isFav):
             interactor.useCase(.addToFavs(code: stationCode, isFavorite: isFav))
-        case .addAsHome(let stationName, let code):
-            interactor.useCase(.addAsHome(stationName: stationName, stationCode: code))
+        case .addAsHome(let stationName, let code, let codeCity):
+            interactor.useCase(.addAsHome(stationName: stationName, stationCode: code, codeCity: codeCity))
+        case .presentCurrentWeather(let stationCode):
+            break
         }
     }
     private var cancellables: Set<AnyCancellable> = []
@@ -111,7 +121,7 @@ final class HomeStationViewModel: ObservableObject {
             return .idle
         case .loading:
             return .loading
-        case .loaded(let representable, let stationCode, let isHome):
+        case .loaded(let representable, let stationCode, let cityCode, let isHome):
             print("avvp [HOME STATION VM] - \(dump(representable))")
             let values = representable.map {
                 HomeStation.Representable.Values(key: $0.key, value: $0.value, time: $0.time)
@@ -121,6 +131,7 @@ final class HomeStationViewModel: ObservableObject {
                     values: values,
                     name: representable.first?.name ?? "",
                     code: stationCode,
+                    cityCode: cityCode,
                     isFavorite: representable.first?.isFavorite ?? false,
                     isHome: isHome
                 )

@@ -16,7 +16,7 @@ struct TabBarView: View {
         ])
     }()
     private let stationsViewModel: StationsListViewModel
-    private let forecastViewModel: Forecast.ViewModel<Forecast.InteractorImpl>
+//    private let forecastViewModel: Forecast.ViewModel<Forecast.InteractorImpl>
     private let homeViewModel: HomeStationViewModel
     private let favsViewModel: FavoritesViewModel
     
@@ -33,20 +33,21 @@ struct TabBarView: View {
         )
         favsViewModel = FavoritesViewModel(interactor: FavoritesInteractorImpl(databaseManager: DatabaseManager.shared))
         
-        forecastViewModel = Forecast.ViewModel(
-            interactor: Forecast.InteractorImpl(databaseManager: databaseManager)
-        )
+//        forecastViewModel = Forecast.ViewModel(
+//            interactor: Forecast.InteractorImpl(databaseManager: databaseManager)
+//        )
     }
     
     var body: some View {
         TabView {
+            /*
             ForecastView(
                 viewModel: forecastViewModel
             )
             .tabItem {
                 Image(systemName: "cloud.sun.bolt.circle")
                 Text("Forecast")
-            }
+            }*/
             
             HomeStationView(
                 viewModel: homeViewModel

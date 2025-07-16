@@ -63,6 +63,7 @@ private struct InteractorMock: HomeStationInteractorProtocol {
                          DTO.HomeStation(name: "Vic", key: "Temp Mitjana", value: "10.2 C", time: nil, isFavorite: true),
                          DTO.HomeStation(name: "Vic", key: "Pluja", value: "0.0 mm", time: nil, isFavorite: true)],
                     stationCode: "",
+                    cityCode: "",
                     isHome: false
                 )
             )

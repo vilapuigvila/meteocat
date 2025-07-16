@@ -50,8 +50,8 @@
             filePath = "meteocat/Views/Favorites_Tab/Favorites.MainView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "105"
-            endingLineNumber = "105"
+            startingLineNumber = "106"
+            endingLineNumber = "106"
             landmarkName = "body"
             landmarkType = "24">
          </BreakpointContent>
@@ -82,8 +82,8 @@
             filePath = "meteocat/Views/Forecast_Tab/Forecast.MainView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "81"
-            endingLineNumber = "81"
+            startingLineNumber = "83"
+            endingLineNumber = "83"
             landmarkName = "requestOnAppearIfNeeded(threshold:date:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -107,16 +107,16 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "9D4D11FD-A5A1-41E9-90D4-C6F4BCB40E61"
+            uuid = "1889C620-3273-4031-BA05-D82EE4C10B1A"
             shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "meteocat/Views/Forecast_Tab/Forecast.Interactor.swift"
+            filePath = "meteocat/Network/Requester.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "58"
-            endingLineNumber = "58"
-            landmarkName = "getForecastInfo()"
+            startingLineNumber = "158"
+            endingLineNumber = "158"
+            landmarkName = "getCurrentWeather(code:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

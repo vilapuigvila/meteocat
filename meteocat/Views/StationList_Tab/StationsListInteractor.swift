@@ -74,6 +74,8 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         } else {
             fetchAndStoreStations()
         }
+#warning("avpv check it out ⚠️ -> remove")
+        fetchAndStoreStations()
     }
     
     /// Retrieves stored stations if they are not outdated
@@ -103,16 +105,26 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         subject.send(.init(list: [], isLoading: true))
         
         requestStationsTask = Task { [weak self] in
-            let result = await ServerData.fetchStations()
-            let sortedStations = result.sorted {
-                $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
-            }
-            self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
-            if !result.isEmpty {
-                await self?.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
+            do {
+                let result: [DTO.Station] = try await ServerData.request(.stations)
+                let sortedStations = result.sorted {
+                    $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
+                }
+                self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
+                
+                guard !result.isEmpty else {
+                    return
+                }
+                print("avpv 🛜 - stations from api")
+                
+                guard let self = self else {
+                    return assertionFailure()
+                }
+                try await self.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
+            } catch {
+                assertionFailure(error.localizedDescription)
             }
             self?.requestStationsTask = nil
-            print("avp 🛜 - stations from api")
         }
     }
 
@@ -122,16 +134,23 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     }
     
     @MainActor
-    private func refreshStationInDatabase(_ stations: [DTO.Station], timeInterval: TimeInterval) {
+    private func refreshStationInDatabase(_ stations: [DTO.Station], timeInterval: TimeInterval) throws {
+        // city.codi
         let stations = stations.map {
-            Model.Station(code: $0.code, name: $0.name, type: $0.type, lastUpdated: timeInterval)
+            Model.Station(
+                code: $0.code,
+                codeCity: $0.city.codi,
+                name: $0.name,
+                type: $0.type,
+                lastUpdated: timeInterval
+            )
         }
         do {
-            // do transaction
             try databaseManager.deleteAll(Model.Station.self)
             try databaseManager.insert(stations)
+            print("avpv 🔋 - stations stored in daata base")
         } catch {
-            assertionFailure(error.localizedDescription)
+            throw error
         }
     }
 }

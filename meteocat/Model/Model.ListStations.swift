@@ -15,13 +15,15 @@ extension Model {
         var id: String { code }
         
         private(set) var code: String
+        private(set) var codeCity: String
         private(set) var name: String
         private(set) var type: String
         private(set)var lastUpdated: TimeInterval
         private(set)var isFavorite: Bool = false
         
-        init(code: String, name: String, type: String, lastUpdated: TimeInterval) {
+        init(code: String, codeCity: String, name: String, type: String, lastUpdated: TimeInterval) {
             self.code = code
+            self.codeCity = codeCity
             self.name = name
             self.type = type
             self.lastUpdated = lastUpdated

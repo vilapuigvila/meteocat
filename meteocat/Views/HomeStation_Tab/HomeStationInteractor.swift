@@ -46,7 +46,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 self?.cancel()
             }
         case .requestStation(let date):
-            guard let code = self.getCodeAccordingSource() else {
+            guard let (stationCode, cityCode) = self.getCodesAccordingSource() else {
                 subject.send(.error(.missingCode))
                 return
             }
@@ -54,17 +54,17 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 guard let self else { assertionFailure(); return }
                 self.subject.send(.loading)
                 
-                if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: code, date: date) {
-                    self.subject.send(.loaded(dto: dto, stationCode: code, isHome: self.isHomeStation))
+                if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: stationCode, date: date) {
+                    self.subject.send(.loaded(dto: dto, stationCode: stationCode, cityCode: cityCode, isHome: self.isHomeStation))
                 } else {
                     do {
                         let dto = try await StationWorker.requestInfoStation(
                             self.databaseManager,
-                            code: code,
+                            code: stationCode,
                             date: date,
                             store: true
                         )
-                        self.subject.send(.loaded(dto: dto, stationCode: code, isHome: self.isHomeStation))
+                        self.subject.send(.loaded(dto: dto, stationCode: stationCode, cityCode: cityCode, isHome: self.isHomeStation))
                     } catch {
                         if error is Requester.ErrorReason {
                             self.subject.send(.error(.unknown(error.localizedDescription)))
@@ -84,9 +84,9 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                     self.subject.send(domain.copy(isFavorite: !isFav))
                 }
             }
-        case .addAsHome(let stationName, let stationCode):
-            if let stationCode, let stationName {
-                UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode)
+        case .addAsHome(let stationName, let stationCode, let codeCity):
+            if let stationCode, let stationName, let codeCity {
+                UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode, codeCity: codeCity)
             } else {
                 UserSettings.homeStation = nil
             }
@@ -117,12 +117,15 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         }
     }
     
-    private func getCodeAccordingSource() -> String? {
+    private func getCodesAccordingSource() -> (stationCode: String, cityCode: String)? {
         switch source {
         case .homeStation:
-            UserSettings.homeStation?.code
-        case .detailStation(let code):
-            code
+            guard let homeStation = UserSettings.homeStation else {
+                return nil
+            }
+            return (homeStation.code, homeStation.codeCity)
+        case .detailStation(let code, let cityCode):
+            return (code, cityCode)
         }
     }
 
@@ -130,7 +133,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         guard let stationCode = UserSettings.homeStation?.code else {
             return false
         }
-        guard case .detailStation(let code) = source else {
+        guard case .detailStation(let code, _) = source else {
             return false
         }
         return stationCode == code
@@ -148,7 +151,7 @@ extension HomeStationInteractorImpl {
     // MARK: - Init interactor from -
     
     enum Source: Equatable {
-        case homeStation, detailStation(code: String)
+        case homeStation, detailStation(code: String, cityCode: String)
     }
     
     // MARK: - Action -
@@ -156,7 +159,7 @@ extension HomeStationInteractorImpl {
     enum UseCase {
         case requestStation(date: Date)
         case addToFavs(code: String, isFavorite: Bool)
-        case addAsHome(stationName: String?, stationCode: String?)
+        case addAsHome(stationName: String?, stationCode: String?, codeCity: String?)
         case cancelRequestStation
     }
     
