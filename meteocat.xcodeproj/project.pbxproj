@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5021854B2E857D4800E6F003 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5021854A2E857D4800E6F003 /* GoogleService-Info.plist */; };
+		5021854F2E85859000E6F003 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 5021854E2E85859000E6F003 /* FirebaseAnalytics */; };
+		502185512E85859000E6F003 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 502185502E85859000E6F003 /* FirebaseCrashlytics */; };
+		502185532E85859000E6F003 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 502185522E85859000E6F003 /* FirebaseRemoteConfig */; };
 		504ECD3D2DE84CA100C95D80 /* Alfy in Frameworks */ = {isa = PBXBuildFile; productRef = 504ECD3C2DE84CA100C95D80 /* Alfy */; };
 		50EF9FBC2CD3846B0066CAAE /* meteocatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */; };
 		50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC12CD3846D0066CAAE /* Assets.xcassets */; };
@@ -14,6 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5021854A2E857D4800E6F003 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		50EF9FB82CD3846B0066CAAE /* meteocat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = meteocat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = meteocatApp.swift; sourceTree = "<group>"; };
 		50EF9FC12CD3846D0066CAAE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -35,7 +40,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				502185512E85859000E6F003 /* FirebaseCrashlytics in Frameworks */,
+				5021854F2E85859000E6F003 /* FirebaseAnalytics in Frameworks */,
 				504ECD3D2DE84CA100C95D80 /* Alfy in Frameworks */,
+				502185532E85859000E6F003 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +79,7 @@
 				50EF9FC32CD3846D0066CAAE /* Preview Content */,
 				50EA91562D550E7C00E22B0A /* UserPreferences */,
 				50F89E3C2D52036F00F7884F /* Views */,
+				5021854A2E857D4800E6F003 /* GoogleService-Info.plist */,
 			);
 			path = meteocat;
 			sourceTree = "<group>";
@@ -93,6 +102,7 @@
 				50EF9FB42CD3846B0066CAAE /* Sources */,
 				50EF9FB52CD3846B0066CAAE /* Frameworks */,
 				50EF9FB62CD3846B0066CAAE /* Resources */,
+				5021854C2E857D8600E6F003 /* Crashlytics */,
 			);
 			buildRules = (
 			);
@@ -110,6 +120,9 @@
 			name = meteocat;
 			packageProductDependencies = (
 				504ECD3C2DE84CA100C95D80 /* Alfy */,
+				5021854E2E85859000E6F003 /* FirebaseAnalytics */,
+				502185502E85859000E6F003 /* FirebaseCrashlytics */,
+				502185522E85859000E6F003 /* FirebaseRemoteConfig */,
 			);
 			productName = meteocat;
 			productReference = 50EF9FB82CD3846B0066CAAE /* meteocat.app */;
@@ -141,6 +154,7 @@
 			mainGroup = 50EF9FAF2CD3846B0066CAAE;
 			packageReferences = (
 				504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */,
+				5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			productRefGroup = 50EF9FB92CD3846B0066CAAE /* Products */;
 			projectDirPath = "";
@@ -158,10 +172,39 @@
 			files = (
 				50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */,
 				50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */,
+				5021854B2E857D4800E6F003 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		5021854C2E857D8600E6F003 /* Crashlytics */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"$(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = Crashlytics;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		50EF9FB42CD3846B0066CAAE /* Sources */ = {
@@ -302,6 +345,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"meteocat/Preview Content\"";
 				DEVELOPMENT_TEAM = HL99S7U2Q3;
 				ENABLE_PREVIEWS = YES;
@@ -382,6 +426,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.3.0;
+			};
+		};
 		504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/vilapuigvila/Alfy.git";
@@ -393,6 +445,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5021854E2E85859000E6F003 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		502185502E85859000E6F003 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		502185522E85859000E6F003 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
+		};
 		504ECD3C2DE84CA100C95D80 /* Alfy */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */;

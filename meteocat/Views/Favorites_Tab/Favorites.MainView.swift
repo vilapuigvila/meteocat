@@ -82,7 +82,6 @@ extension Favorites {
                             action(.onAppear)
                         }) {
                             if let selectedItem {
-                                let _ = assertionFailure()
                                 let viewModel = HomeStationViewModel(
                                     stationName: selectedItem.name,
                                     interactor: HomeStationInteractorImpl(

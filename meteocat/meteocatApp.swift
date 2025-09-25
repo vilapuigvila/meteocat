@@ -9,6 +9,8 @@ import SwiftUI
 import Alfy
 import SDWebImage
 import SDWebImageSVGCoder
+import FirebaseCore
+import FirebaseCrashlytics
 
 @main
 struct meteocatApp: App {
@@ -26,6 +28,7 @@ struct meteocatApp: App {
     }()*/
     
     init() {
+        FirebaseApp.configure()
         let svgCoder = SDImageSVGCoder.shared
         SDImageCodersManager.shared.addCoder(svgCoder)
     }

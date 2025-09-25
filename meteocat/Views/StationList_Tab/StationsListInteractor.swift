@@ -75,7 +75,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
             fetchAndStoreStations()
         }
 #warning("avpv check it out ⚠️ -> remove")
-        fetchAndStoreStations()
+//        fetchAndStoreStations()
     }
     
     /// Retrieves stored stations if they are not outdated
