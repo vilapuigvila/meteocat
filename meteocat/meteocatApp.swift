@@ -40,3 +40,70 @@ struct meteocatApp: App {
 //        .modelContainer(sharedModelContainer)
     }
 }
+
+// MARK: - move to Alfy -
+
+struct CrashlyticsManager {
+    static func reportNonFatal(error: CrashlyticsNonFatalError, domain: String) {
+        report(error, domain: domain)
+    }
+
+    static func report(_ error: CrashlyticsNonFatalError, domain: String) {
+        Crashlytics.crashlytics().record(error: error.asNSError(domain: domain))
+    }
+}
+
+enum CrashlyticsNonFatalError: Error {
+    case generic(_ message: String, _ file: String, _ line: UInt, _ code: UInt)
+
+    var userInfo: [String: Any] {
+        switch self {
+        case .generic(let message, let file, let line, _):
+            return [CrashlyticsNonFatalError.LocalizedDescription: message,
+                    CrashlyticsNonFatalError.LocalizedFile: file,
+                    CrashlyticsNonFatalError.LocalizedLine: Int(line)]
+        }
+    }
+    var code: UInt {
+        switch self {
+        case .generic(_, _, _, let code): return code
+        }
+    }
+
+    func asNSError(domain: String) -> NSError {
+        return NSError(domain: domain, code: 0, userInfo: userInfo)
+    }
+}
+
+extension CrashlyticsNonFatalError {
+    private static let LocalizedDescription = "description"
+    private static let LocalizedFile = "file"
+    private static let LocalizedLine = "line"
+}
+
+func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
+                       _ message: @autoclosure () -> String,
+                       domain: CrashlyticsDomain = .meteocat,
+                       file: StaticString = #file,
+                       line: UInt = #line,
+                       code: UInt? = UInt(0)
+) {
+    #if DEBUG
+    guard !condition() else {
+        return
+    }
+    assert(condition(), message())
+    guard !condition() else {
+        return
+    }
+    CrashlyticsManager.reportNonFatal(
+        error: .generic(message(),
+        "\(file)",
+        line, code ?? UInt(0)),
+        domain: domain.rawValue
+    )
+    #endif
+}
+enum CrashlyticsDomain: String {
+    case meteocat
+}

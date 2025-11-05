@@ -33,7 +33,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         if case .loaded(_, let code, _, _) = self {
             return code
         } else {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             return ""
         }
     }
@@ -41,7 +41,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         if case .loaded(_, _, let cityCode, _) = self {
             return cityCode
         } else {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             return ""
         }
     }
@@ -49,7 +49,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         if case .loaded(_, _, _, let isHome) = self {
             return isHome
         } else {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             return false
         }
     }
@@ -57,7 +57,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         if case .loaded(let dto, _, _, _) = self {
             return dto.first?.isFavorite ?? false
         } else {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             return false
         }
     }

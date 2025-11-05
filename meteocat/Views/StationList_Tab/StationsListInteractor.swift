@@ -88,7 +88,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
                 sortBy: [SortDescriptor(\Model.Station.name, order: .forward)]
             )
             if stations.count >= 1 {
-                assert(stations.first?.lastUpdated != nil)
+                nonFatalCrashlytics(stations.first?.lastUpdated != nil, "")
             }
             guard let lastUpdated = stations.first?.lastUpdated else {
                 return nil
@@ -118,11 +118,11 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
                 print("avpv 🛜 - stations from api")
                 
                 guard let self = self else {
-                    return assertionFailure()
+                    return nonFatalCrashlytics(false, "dataCorrupted")
                 }
                 try await self.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
             } catch {
-                assertionFailure(error.localizedDescription)
+                nonFatalCrashlytics(false, error.localizedDescription)
             }
             self?.requestStationsTask = nil
         }

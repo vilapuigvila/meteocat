@@ -51,7 +51,7 @@ extension Forecast {
         
         private func getForecastInfo() async {
             guard let code = UserSettings.homeStation?.codeCity else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 subject.send(
                     domain.copy(
                         isLoading: false,
@@ -72,7 +72,7 @@ extension Forecast {
                 )
                 subject.send(domain)
             } catch {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 subject.send(domain.copy(isLoading: false, error: error.toEquatableError()))
             }
         }

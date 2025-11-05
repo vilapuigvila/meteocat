@@ -56,7 +56,7 @@ struct ServerData {
     private static func getCurrentWeather(code: String) async throws -> DTO.CurrentWeather {
         let data = try await Requester.request("https://m.meteo.cat/?codi=\(code)").data
         guard let html = String(data: data, encoding: .utf8) else {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             throw Requester.ErrorReason.dataCorrupted
         }
         do {
@@ -170,12 +170,12 @@ struct ServerData {
                   let firstLecture = lectures.first,
                   let valor = firstLecture["valor"] as? Double
             else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 throw Requester.ErrorReason.dataCorrupted
             }
             return DTO.LastTemperature(lastTemp: valor, date: "")
         } catch {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             throw Requester.ErrorReason.dataCorrupted
         }
     }
@@ -196,13 +196,13 @@ struct ServerData {
         do {
             let data = try await Requester.request("https://www.meteo.cat/observacions/xema").data
             guard let html = String(data: data, encoding: .utf8) else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 return []
             }
             return parseStations(from: html)
             
         } catch {
-            assertionFailure(error.localizedDescription)
+            nonFatalCrashlytics(false, error.localizedDescription)
             return []
         }
     }
@@ -224,7 +224,7 @@ struct ServerData {
                 }
             }
             guard let json = jsonString else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 return []
             }
             
@@ -236,21 +236,21 @@ struct ServerData {
                     jsonString = String(jsonString.dropLast())
                 }
                 guard let jsonData = jsonString.data(using: .utf8) else {
-                    assertionFailure()
+                    nonFatalCrashlytics(false, "dataCorrupted")
                     return []
                 }
                 do {
                     // ✅ Decode into a dictionary of stations
                     return try JSONDecoder().decode(Stations.self, from: jsonData).map { $0.value }
                 } catch {
-                    assertionFailure()
+                    nonFatalCrashlytics(false, "dataCorrupted")
                     return []
                 }
             } else {
                 return []
             }
         } catch {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
             return []
         }
     }
@@ -263,7 +263,7 @@ struct ServerData {
 extension ServerData {
     
     static func requestStation(code: String, date: Date) async throws -> [DTO.HomeStation] {
-        assert(!code.isEmpty)
+        nonFatalCrashlytics(!code.isEmpty, "")
 //        let value = await getLastTemperature(forStationCode: "CC")
 //        print("avpv - \(value)")
         
@@ -276,7 +276,7 @@ extension ServerData {
             let document = try SwiftSoup.parse(htmlContent)
             print("avpv - \(document)")
         } catch {
-            assertionFailure()
+            nonFatalCrashlytics(false, "dataCorrupted")
         }*/
         
         let formattedDate = dateFormatterForRequestStation(date) // 2025-02-01T07:00Z
@@ -339,17 +339,17 @@ extension ServerData {
                 throw error
             } else {
                 guard let urlError = error as? URLError else {
-                    assertionFailure()
+                    nonFatalCrashlytics(false, "dataCorrupted")
                     throw error
                 }
                 switch urlError.code {
                 case .notConnectedToInternet:
                     throw Requester.ErrorReason.noInternetConnection
                 case .cancelled:
-                    assertionFailure()
+                    nonFatalCrashlytics(false, "dataCorrupted")
                     throw Requester.ErrorReason.generic(statusCode: 500)
                 default:
-                    assertionFailure()
+                    nonFatalCrashlytics(false, "dataCorrupted")
                     throw Requester.ErrorReason.dataCorrupted
                 }
             }

@@ -130,12 +130,12 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
         } catch {
             if error is Requester.ErrorReason {
                 guard case Requester.ErrorReason.noInternetConnection = error else {
-                    assertionFailure(error.localizedDescription)
+                    nonFatalCrashlytics(false, error.localizedDescription)
                     return nil
                 }
                 throw Requester.ErrorReason.noInternetConnection
             } else {
-                assertionFailure(error.localizedDescription)
+                nonFatalCrashlytics(false, error.localizedDescription)
                 return nil
             }
         }
@@ -144,14 +144,14 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     private static func mapStationInfo(_ dto: [DTO.HomeStation], code: String) -> Fav {
         let maxTemp: String = {
             guard let max = dto.first(where: { Self.normalized($0.key).contains("temperatura maxima") }) else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 return "--"
             }
             return max.value
         }()
         let minTemp: String = {
             guard let min = dto.first(where: { Self.normalized($0.key).contains("temperatura minima") }) else {
-                assertionFailure()
+                nonFatalCrashlytics(false, "dataCorrupted")
                 return "--"
             }
             return min.value

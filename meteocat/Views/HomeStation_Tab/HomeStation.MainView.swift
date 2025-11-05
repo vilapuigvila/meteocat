@@ -120,7 +120,7 @@ extension HomeStation {
                 action(.onDisappear)
             }
             .onChange(of: selectedDate) { oldValue, newValue in
-                guard oldValue != newValue else { return assertionFailure() }
+                guard oldValue != newValue else { return nonFatalCrashlytics(false, "dataCorrupted") }
                 action(.request(date: newValue))
             }
             .onAppLifecycleEvent { lifeCycle in
@@ -295,6 +295,8 @@ extension HomeStation {
                     showSparks = false
                 }
                 withAnimation {
+//                    fatalError("alffffffff")
+//                    nonFatalCrashlytics(false, "hihi")
                     action(.addToFavs(code: representable.code, isFavorite: !representable.isFavorite))
                 }
             } label: {

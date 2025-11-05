@@ -51,7 +51,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 return
             }
             Task { @MainActor [weak self] in
-                guard let self else { assertionFailure(); return }
+                guard let self else { nonFatalCrashlytics(false, "dataCorrupted"); return }
                 self.subject.send(.loading)
                 
                 if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: stationCode, date: date) {
@@ -69,7 +69,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                         if error is Requester.ErrorReason {
                             self.subject.send(.error(.unknown(error.localizedDescription)))
                         } else {
-                            assertionFailure(error.localizedDescription)
+                            nonFatalCrashlytics(false, error.localizedDescription)
                             self.subject.send(.error(.unknown(error.localizedDescription)))
                         }
                     }
@@ -103,7 +103,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             sortBy: nil
         )
         guard let station = stations.first else {
-            return assertionFailure()
+            return nonFatalCrashlytics(false, "dataCorrupted")
         }
         station.movedToFavorite(isFavorite)
         try databaseManager.save()
@@ -240,7 +240,7 @@ struct StationWorker {
             }
             return info
         } catch {
-            assertionFailure(error.localizedDescription)
+            nonFatalCrashlytics(false, error.localizedDescription)
             return nil
         }
     }
@@ -255,7 +255,7 @@ struct StationWorker {
         let predicateStation = #Predicate<Model.Station> { $0.code == code }
         let stations = try? databaseManager.fetchItems(Model.Station.self, predicate: predicateStation, sortBy: nil)
         guard let station = stations?.first else {
-            assertionFailure("should not be nil");
+            nonFatalCrashlytics(false, "should not happen")
             return
         }
         
@@ -272,7 +272,7 @@ struct StationWorker {
         do {
             try databaseManager.insert(info)
         } catch {
-            assertionFailure(error.localizedDescription)
+            nonFatalCrashlytics(false, error.localizedDescription)
         }
     }
     
@@ -309,7 +309,7 @@ struct StationWorker {
             print("avp Deleted \(recordsToDelete.count) record(s).")
         } catch {
             print("Error during fetch or delete: \(error)")
-            assertionFailure(error.localizedDescription)
+            nonFatalCrashlytics(false, error.localizedDescription)
         }
     }
 }

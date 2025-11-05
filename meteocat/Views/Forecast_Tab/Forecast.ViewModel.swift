@@ -47,7 +47,7 @@ extension Forecast {
                 .receive(on: DispatchQueue.main)
                 .map { domain in
                     if let error = domain.error {
-                        assertionFailure(error.localizedDescription)
+                        nonFatalCrashlytics(false, error.localizedDescription)
                         return .error(Forecast.ErrrorView.emptyData)
                     } else if domain.isLoading {
                         return .loading
