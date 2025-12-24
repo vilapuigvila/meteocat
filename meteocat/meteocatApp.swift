@@ -88,11 +88,6 @@ func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
                        line: UInt = #line,
                        code: UInt? = UInt(0)
 ) {
-    #if DEBUG
-    guard !condition() else {
-        return
-    }
-    assert(condition(), message())
     guard !condition() else {
         return
     }
@@ -102,7 +97,7 @@ func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
         line, code ?? UInt(0)),
         domain: domain.rawValue
     )
-    #endif
+    assert(condition(), message())
 }
 enum CrashlyticsDomain: String {
     case meteocat

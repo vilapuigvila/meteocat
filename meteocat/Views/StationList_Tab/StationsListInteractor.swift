@@ -135,20 +135,48 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     
     @MainActor
     private func refreshStationInDatabase(_ stations: [DTO.Station], timeInterval: TimeInterval) throws {
-        // city.codi
-        let stations = stations.map {
-            Model.Station(
-                code: $0.code,
-                codeCity: $0.city.codi,
-                name: $0.name,
-                type: $0.type,
-                lastUpdated: timeInterval
-            )
-        }
         do {
-            try databaseManager.deleteAll(Model.Station.self)
-            try databaseManager.insert(stations)
-            print("avpv 🔋 - stations stored in daata base")
+            let storedStations = try databaseManager.fetchItems(Model.Station.self, predicate: nil, sortBy: nil)
+            var storedByCode: [String: Model.Station] = [:]
+            storedByCode.reserveCapacity(storedStations.count)
+            storedStations.forEach { station in
+                storedByCode[station.code] = station
+            }
+
+            var incomingCodes: Set<String> = []
+            incomingCodes.reserveCapacity(stations.count)
+
+            var stationsToInsert: [Model.Station] = []
+            stationsToInsert.reserveCapacity(stations.count)
+
+            stations.forEach { dto in
+                incomingCodes.insert(dto.code)
+                if let stored = storedByCode[dto.code] {
+                    stored.update(codeCity: dto.city.codi, name: dto.name, type: dto.type, lastUpdated: timeInterval)
+                } else {
+                    stationsToInsert.append(
+                        Model.Station(
+                            code: dto.code,
+                            codeCity: dto.city.codi,
+                            name: dto.name,
+                            type: dto.type,
+                            lastUpdated: timeInterval
+                        )
+                    )
+                }
+            }
+
+            if !stationsToInsert.isEmpty {
+                try databaseManager.insert(stationsToInsert)
+            }
+
+            let stationsToDelete = storedStations.filter { !incomingCodes.contains($0.code) }
+            if !stationsToDelete.isEmpty {
+                try databaseManager.remove(stationsToDelete)
+            }
+
+            try databaseManager.save()
+            print("avpv 🔋 - stations stored in database")
         } catch {
             throw error
         }

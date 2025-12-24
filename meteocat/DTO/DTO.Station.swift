@@ -38,7 +38,7 @@ extension DTO {
             self.city = City(codi: "", nom: "", slug: "", coordenades: Coordinates(latitude: 0, longitude: 0), comarca: "")
             self.region = Region(codi: 0, nom: "")
             self.states = []
-            self.isFavorite = false
+            self.isFavorite = isFavorite
         }
         
         init(from decoder: any Decoder) throws {

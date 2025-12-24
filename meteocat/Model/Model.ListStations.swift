@@ -28,6 +28,13 @@ extension Model {
             self.type = type
             self.lastUpdated = lastUpdated
         }
+
+        func update(codeCity: String, name: String, type: String, lastUpdated: TimeInterval) {
+            self.codeCity = codeCity
+            self.name = name
+            self.type = type
+            self.lastUpdated = lastUpdated
+        }
         
         func movedToFavorite(_ value: Bool) {
             isFavorite = value
