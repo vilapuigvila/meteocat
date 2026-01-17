@@ -29,6 +29,7 @@ extension StationsList {
         @State private var selectedStation: DTO.Station?
         @State private var isPresentedDetail = false
         @State private var isPullToRefresh = false
+        @State private var searchText = ""
 //        @State private var path: [] = []
 
 // "avp check it out ⚠️ -> .navigationTitle(Estacions) comes from top after pull to refresh"
@@ -39,13 +40,19 @@ extension StationsList {
                         .opacity(isPullToRefresh ? 1 : 0)
 //                        .animation(.easeInOut(duration: 0.4), value: isPullToRefresh)
                 } else {
-                    ListView(
-                        viewModel,
-                        selectedStation: $selectedStation,
-                        isPresentedDetail: $isPresentedDetail
-                    )
-                    .refreshable {
-                        viewModel.action(.pullToRefresh)
+                    Group {
+                        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, filteredStations.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        } else {
+                            ListView(
+                                stations: filteredStations,
+                                selectedStation: $selectedStation,
+                                isPresentedDetail: $isPresentedDetail
+                            )
+                            .refreshable {
+                                viewModel.action(.pullToRefresh)
+                            }
+                        }
                     }
                     .navigationTitle("Estacions")
                     .navigationDestination(isPresented: $isPresentedDetail) {
@@ -60,7 +67,9 @@ extension StationsList {
                         }
                     }
                 }
-            }.refreshable {
+            }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search stations")
+            .refreshable {
                 viewModel.action(.pullToRefresh)
             }.onAppear {
                 viewModel.action(.onAppear)
@@ -71,6 +80,17 @@ extension StationsList {
             }
             .onChange(of: viewModel.state) {
                 isPullToRefresh = viewModel.state == .loading
+            }
+        }
+
+        private var filteredStations: [DTO.Station] {
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else { return viewModel.state.result.stations }
+
+            return viewModel.state.result.stations.filter { station in
+                station.name.localizedStandardContains(query)
+                || station.code.localizedStandardContains(query)
+                || station.city.nom.localizedStandardContains(query)
             }
         }
         
@@ -88,15 +108,15 @@ extension StationsList {
     
     fileprivate struct ListView: View {
 #warning("avp check it out ⚠️ -> move to representable")
-        @State var viewModel: StationsListViewModel
+        let stations: [DTO.Station]
         
         @Binding var selectedStation: DTO.Station?
         @Binding var isPresentedDetail: Bool
         
         private let columns = [GridItem(.flexible())]
         
-        init(_ viewModel: StationsListViewModel, selectedStation: Binding<DTO.Station?>, isPresentedDetail: Binding<Bool>) {
-            self.viewModel = viewModel
+        init(stations: [DTO.Station], selectedStation: Binding<DTO.Station?>, isPresentedDetail: Binding<Bool>) {
+            self.stations = stations
             _selectedStation = selectedStation
             _isPresentedDetail = isPresentedDetail
         }
@@ -108,7 +128,7 @@ extension StationsList {
         private func buildNavigationStackView() -> some View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(viewModel.state.result.stations, id: \.self) { item in
+                    ForEach(stations, id: \.code) { item in
                         buildRowView(item)
                     }
                 }
@@ -306,15 +326,7 @@ let viewModelUsingMock3 = StationsListViewModel(interactor: mockInteractor3)
 //
 
 #Preview {
-    
-    let stationsMock: [DTO.Station] = [
-        .init(code: "CC", name: "Orís", type: "", isFavorite: false),
-        .init(code: "CC", name: "Orís", type: "", isFavorite: false),
-        .init(code: "CC", name: "Orís", type: "", isFavorite: false),
-        .init(code: "CC", name: "Orís", type: "", isFavorite: false),
-        .init(code: "CC", name: "Orís", type: "", isFavorite: false)
-    ]
     let mockViewModel: StationsListViewModel = .init(
         interactor: MockStationsListInteractor(behavior: .simulateLoad(initialData: mockStationsPage1)))
-    StationsList.ListView(mockViewModel, selectedStation: .constant(nil), isPresentedDetail: .constant(false))
+    StationsList.MainView(viewModel: mockViewModel)
 }

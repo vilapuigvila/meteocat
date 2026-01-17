@@ -58,10 +58,13 @@ enum CrashlyticsNonFatalError: Error {
 
     var userInfo: [String: Any] {
         switch self {
-        case .generic(let message, let file, let line, _):
-            return [CrashlyticsNonFatalError.LocalizedDescription: message,
-                    CrashlyticsNonFatalError.LocalizedFile: file,
-                    CrashlyticsNonFatalError.LocalizedLine: Int(line)]
+        case .generic(let message, let file, let line, let code):
+            return [
+                NSLocalizedDescriptionKey: message,
+                CrashlyticsNonFatalError.LocalizedFile: file,
+                CrashlyticsNonFatalError.LocalizedLine: Int(line),
+                CrashlyticsNonFatalError.LocalizedCode: Int(code)
+            ]
         }
     }
     var code: UInt {
@@ -71,14 +74,14 @@ enum CrashlyticsNonFatalError: Error {
     }
 
     func asNSError(domain: String) -> NSError {
-        return NSError(domain: domain, code: 0, userInfo: userInfo)
+        NSError(domain: domain, code: Int(code), userInfo: userInfo)
     }
 }
 
 extension CrashlyticsNonFatalError {
-    private static let LocalizedDescription = "description"
     private static let LocalizedFile = "file"
     private static let LocalizedLine = "line"
+    private static let LocalizedCode = "code"
 }
 
 func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
