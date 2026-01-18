@@ -50,12 +50,21 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 subject.send(.error(.missingCode))
                 return
             }
+            
             Task { @MainActor [weak self] in
                 guard let self else { nonFatalCrashlytics(false, "dataCorrupted"); return }
                 self.subject.send(.loading)
                 
+                let summary = await StationWorker.fetchMonthInfoStation(databaseManager, code: stationCode)
+                
                 if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: stationCode, date: date) {
-                    self.subject.send(.loaded(dto: dto, stationCode: stationCode, cityCode: cityCode, isHome: self.isHomeStation))
+                    self.subject.send(.loaded(
+                        dto: dto,
+                        stationCode: stationCode,
+                        cityCode: cityCode,
+                        isHome: self.isHomeStation,
+                        summary: summary.stationDayInfoSummary()
+                    ))
                 } else {
                     do {
                         let dto = try await StationWorker.requestInfoStation(
@@ -64,7 +73,13 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                             date: date,
                             store: true
                         )
-                        self.subject.send(.loaded(dto: dto, stationCode: stationCode, cityCode: cityCode, isHome: self.isHomeStation))
+                        self.subject.send(.loaded(
+                            dto: dto,
+                            stationCode: stationCode,
+                            cityCode: cityCode,
+                            isHome: self.isHomeStation,
+                            summary: summary.stationDayInfoSummary()
+                        ))
                     } catch {
                         if error is Requester.ErrorReason {
                             self.subject.send(.error(.unknown(error.localizedDescription)))
@@ -94,7 +109,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             subject.send(_domain)
         }
     }
-
+    
     @MainActor
     private func addToFavs(code: String, isFavorite: Bool) throws {
         let stations = try databaseManager.fetchItems(
@@ -174,142 +189,6 @@ extension HomeStationInteractorImpl {
         
         func asHomeStationErrorView() -> HomeStation.ErrorView {
             HomeStation.ErrorView(stationInteractorError: self)
-        }
-    }
-}
-
-struct StationWorker {
-
-    static func requestInfoStation(
-        _ database: DatabaseManagerProtocol,
-        code: String,
-        date: Date,
-        store: Bool
-    ) async throws -> [DTO.HomeStation] {
-        let dto: [DTO.HomeStation] = try await ServerData.requestStation(code: code, date: date)
-        if store {
-            await insertInfoDay(database, dto: dto, code: code, forDate: date)
-        }
-        return dto
-    }
-    
-    @MainActor
-    static func fetchInfoStation(
-        _ database: DatabaseManagerProtocol,
-        code: String,
-        date: Date
-    ) -> [DTO.HomeStation]? {
-        guard let info = fetchInfoDayFromDatabase(database, code: code, date: date) else {
-            return nil
-        }
-        let dto = info.values.map {
-            DTO.HomeStation(
-                name: $0.name,
-                key: $0.key,
-                value: $0.value,
-                time: $0.time,
-                isFavorite: info.station?.isFavorite ?? false
-            )
-        }
-        print("avpv - fetch InfoDay from cache")
-        return dto
-    }
-    
-    @MainActor
-    private static func fetchInfoDayFromDatabase(
-        _ databaseManager: DatabaseManagerProtocol,
-        code: String,
-        date: Date
-    ) -> Model.InfoStationByDate? {
-        let startOfDay = Calendar.current.startOfDay(for: date)
-        let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
-        let startOfDayTI = startOfDay.timeIntervalSince1970
-        let endOfDayTI = endOfDay.timeIntervalSince1970
-        let threshold = date.addingTimeInterval(-60*60).timeIntervalSince1970
-        
-        let pred = #Predicate<Model.InfoStationByDate> { info in
-            info.station?.code == code
-            && info.createdAt >= startOfDayTI && info.createdAt < endOfDayTI
-            && info.createdAt > threshold
-        }
-        do {
-            let infos = try databaseManager.fetchItems(Model.InfoStationByDate.self, predicate: pred, sortBy: nil)
-            guard let info = infos.first else {
-                print("avp - outdated less than 60 minutes. Should request new one")
-                return nil
-            }
-            return info
-        } catch {
-            nonFatalCrashlytics(false, error.localizedDescription)
-            return nil
-        }
-    }
-    
-    @MainActor
-    private static func insertInfoDay(
-        _ databaseManager: DatabaseManagerProtocol,
-        dto: [DTO.HomeStation],
-        code: String,
-        forDate date: Date
-    ) {
-        let predicateStation = #Predicate<Model.Station> { $0.code == code }
-        let stations = try? databaseManager.fetchItems(Model.Station.self, predicate: predicateStation, sortBy: nil)
-        guard let station = stations?.first else {
-            nonFatalCrashlytics(false, "should not happen")
-            return
-        }
-        
-        pruneInfoStationsUnlessTheMostRecent(databaseManager, stationCode: code, forDate: date)
-        
-        let createdAt = date.timeIntervalSince1970
-        let info = Model.InfoStationByDate(
-            values: dto.map {
-                Model.InfoStationByDate.Day(name: $0.name, key: $0.key, value: $0.value, time: $0.time)
-            },
-            createdAt: createdAt,
-            station: station
-        )
-        do {
-            try databaseManager.insert(info)
-        } catch {
-            nonFatalCrashlytics(false, error.localizedDescription)
-        }
-    }
-    
-    @MainActor
-    private static func pruneInfoStationsUnlessTheMostRecent(
-        _ databaseManager: DatabaseManagerProtocol,
-        stationCode: String,
-        forDate date: Date
-    ) {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: date)
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-        let startOfDayTI = startOfDay.timeIntervalSince1970
-        let endOfDayTI = endOfDay.timeIntervalSince1970
-//        let threshold = Date().addingTimeInterval(-20).timeIntervalSince1970
-        
-        // 3. Build the predicate to fetch InfoStationByDate records created today for that station.
-        let predicate = #Predicate<Model.InfoStationByDate> { info in
-            info.station?.code == stationCode
-            && info.createdAt >= startOfDayTI && info.createdAt < endOfDayTI
-//            && info.createdAt < threshold
-        }
-        
-        do {
-            let results = try databaseManager.fetchItems(Model.InfoStationByDate.self, predicate: predicate, sortBy: nil)
-            let sortedResults = results.sorted { $0.createdAt > $1.createdAt }
-            
-            guard let mostRecent = sortedResults.first else {
-                print("avp - No records for today found.")
-                return
-            }
-            let recordsToDelete = sortedResults.filter { $0 !== mostRecent }
-            try databaseManager.remove(recordsToDelete)
-            print("avp Deleted \(recordsToDelete.count) record(s).")
-        } catch {
-            print("Error during fetch or delete: \(error)")
-            nonFatalCrashlytics(false, error.localizedDescription)
         }
     }
 }

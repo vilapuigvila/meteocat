@@ -18,19 +18,24 @@ enum StateDomain<T: Equatable & Sendable>: Equatable, Sendable {
 */
 
 enum HomeStationStateDomain: Equatable, Sendable {
+    struct Domain: Equatable, Sendable {
+        let dto: [DTO.HomeStation]
+        let summary: StationDayInfoSummary
+    }
+    
     case idle
     case loading
-    case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool)
+    case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool, summary: StationDayInfoSummary)
     case error(HomeStationInteractorImpl.ErrorReason)
     
     var result: [DTO.HomeStation] {
-        guard case .loaded(let dto, _, _, _) = self else {
+        guard case .loaded(let dto, _, _, _, _) = self else {
             return []
         }
         return dto
     }
     var stationCode: String {
-        if case .loaded(_, let code, _, _) = self {
+        if case .loaded(_, let code, _, _, _) = self {
             return code
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -38,15 +43,23 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var cityCode: String {
-        if case .loaded(_, _, let cityCode, _) = self {
+        if case .loaded(_, _, let cityCode, _, _) = self {
             return cityCode
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
             return ""
         }
     }
+    var summuary: StationDayInfoSummary {
+        if case .loaded(_, _, _, _, let summary) = self {
+            return summary
+        } else {
+            nonFatalCrashlytics(false, "dataCorrupted")
+            return .init(averageTemp: nil, accumulatedRain: nil, firstDate: 0, lastDate: 0)
+        }
+    }
     var isHome: Bool {
-        if case .loaded(_, _, _, let isHome) = self {
+        if case .loaded(_, _, _, let isHome, _) = self {
             return isHome
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -54,7 +67,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var isFavorite: Bool {
-        if case .loaded(let dto, _, _, _) = self {
+        if case .loaded(let dto, _, _, _, _) = self {
             return dto.first?.isFavorite ?? false
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -71,7 +84,8 @@ enum HomeStationStateDomain: Equatable, Sendable {
             },
             stationCode: stationCode,
             cityCode: cityCode,
-            isHome: isHome ?? self.isHome
+            isHome: isHome ?? self.isHome,
+            summary: summuary
         )
     }
 }
@@ -121,7 +135,7 @@ final class HomeStationViewModel: ObservableObject {
             return .idle
         case .loading:
             return .loading
-        case .loaded(let representable, let stationCode, let cityCode, let isHome):
+        case .loaded(let representable, let stationCode, let cityCode, let isHome, let summary):
             print("avvp [HOME STATION VM] - \(dump(representable))")
             let values = representable.map {
                 HomeStation.Representable.Values(key: $0.key, value: $0.value, time: $0.time)
@@ -133,11 +147,68 @@ final class HomeStationViewModel: ObservableObject {
                     code: stationCode,
                     cityCode: cityCode,
                     isFavorite: representable.first?.isFavorite ?? false,
-                    isHome: isHome
+                    isHome: isHome,
+                    averageTemp: summary.averageTemp == nil ? "--" : "\(summary.averageTemp!)",
+                    accumulatedRain: summary.accumulatedRain == nil ? "--" : "\(summary.accumulatedRain!)"
                 )
             )
         case .error(let error):
             return .error(error.asHomeStationErrorView())
         }
+    }
+}
+
+// MARK: - helper  -
+
+struct StationDayInfoSummary: Equatable, Sendable {
+    let averageTemp: Double?
+    let accumulatedRain: Double?
+    let firstDate: Double
+    let lastDate: Double
+}
+
+extension Array where Element == StationDayInfo {
+
+    func stationDayInfoSummary() -> StationDayInfoSummary {
+        guard let first = self.min(by: { $0.date < $1.date }),
+              let last = self.max(by: { $0.date < $1.date })
+        else {
+            return .init(averageTemp: nil, accumulatedRain: nil, firstDate: 0, lastDate: 0)
+        }
+
+        return .init(
+            averageTemp: averageValue(forKey: "temperatura mitjana", isRain: false),
+            accumulatedRain: averageValue(forKey: "precipitació acumulada", isRain: true),
+            firstDate: Date(timeIntervalSince1970: first.date).timeIntervalSince1970,
+            lastDate: Date(timeIntervalSince1970: last.date).timeIntervalSince1970
+        )
+    }
+
+    private func averageValue(forKey key: String, isRain: Bool) -> Double? {
+        let normalizedKey = normalize(key)
+        let values: [Double] = compactMap { dayInfo in
+            guard let entry = dayInfo.info.first(where: { normalize($0.key) == normalizedKey }) else {
+                return nil
+            }
+            return parseDouble(from: entry.value)
+        }
+        guard !values.isEmpty else { return nil }
+        if isRain {
+            return (values.reduce(0, +) * 10).rounded() / 10
+        } else {
+            let total = values.reduce(0, +) / Double(values.count)
+            return (total * 10).rounded() / 10
+        }
+    }
+
+    private func normalize(_ string: String) -> String {
+        string.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+    }
+
+    private func parseDouble(from string: String) -> Double? {
+        let candidate = string.replacingOccurrences(of: ",", with: ".")
+        let scanner = Scanner(string: candidate)
+        scanner.charactersToBeSkipped = CharacterSet(charactersIn: "0123456789.-").inverted
+        return scanner.scanDouble()
     }
 }

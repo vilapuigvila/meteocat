@@ -9,31 +9,11 @@ import Foundation
 import Combine
 import Alfy
 
-struct FavoritesDomain {
-    struct FavoriteValue: Identifiable {
-        let id = UUID()
-        let name: String
-        let maxTemp: String
-        let minTemp: String
-        let rainAcc: String
-        let code: String
-        let isFavorite: Bool
-    }
-    static let empty: FavoritesDomain = .init(list: [], isLoading: false, error: nil)
-    
-    let list: [FavoriteValue]
-    let isLoading: Bool
-    let error: FavoritesInteractorImpl.ErrorReason?
-    /*
-    func copy(list: [FavoriteValue]? = nil, isLoading: Bool? = nil) -> StationsListDomain {
-//        .init(list: list ?? self.list, isLoading: isLoading ?? self.isLoading)
-    }*/ 
-}
-
 protocol FavoritesInteractorProtocol {
     var domain: FavoritesDomain { get }
     var publisher: AnyPublisher<FavoritesDomain, Never> { get }
     func useCase(_ useCase: FavoritesInteractorImpl.UseCase)
+    func fetchFavoritesMonthToDate(referenceDate: Date) async throws -> [FavoritesDomain.StationValues]
 }
 
 final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
@@ -46,6 +26,8 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     }
     var domain: FavoritesDomain { subject.value }
     
+//    print("avpv - \(String(describing: interval))")
+    private let throttle = RequestThrottleController(minimumInterval: 1, extraRequestsLimit: 2)
     let databaseManager: DatabaseManagerProtocol
     
     init(databaseManager: DatabaseManagerProtocol) {
@@ -55,6 +37,9 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     func useCase(_ useCase: FavoritesInteractorImpl.UseCase) {
         switch useCase {
         case .fetchFavorites:
+            guard throttle.startRequestIfAllowed(at: Date()) else {
+                return
+            }
             Task {
                 await fetchFavoritesFromData()
             }
@@ -69,6 +54,8 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     
     @MainActor
     private func fetchFavoritesFromData() {
+        requestStationsTask?.cancel()
+        
         subject.send(FavoritesDomain(list: domain.list, isLoading: true, error: nil))
         
         do {
@@ -80,12 +67,13 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             let favs = stations.map {
                 DTO.Station(code: $0.code, name: $0.name, type: $0.type, isFavorite: $0.isFavorite)
             }
-            Task {
+            requestStationsTask = Task {
+                
                 do {
                     let result: [Fav] = try await withThrowingTaskGroup(of: Fav?.self) { group in
                         for fav in favs {
                             group.addTask {
-                                try await self.requestInfoStation(code: fav.code)
+                                try await self.requestInfoStation(code: fav.code, date: Date())
                             }
                         }
                         var favsResult = [Fav]()
@@ -100,8 +88,12 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                             throw error
                         }
                     }
+                    throttle.registerOutcome(isFailure: false)
                     subject.send(FavoritesDomain(list: result, isLoading: false, error: nil))
                 } catch {
+                    if Task.isCancelled {
+                        return
+                    }
                     let domainError: FavoritesInteractorImpl.ErrorReason
                     switch error as? Requester.ErrorReason {
                     case .noInternetConnection:
@@ -111,21 +103,30 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                     default:
                         domainError = .unknown(error.localizedDescription)
                     }
+                    nonFatalCrashlytics(false, error.localizedDescription, domain: .fetch_favorites)
+                    throttle.registerOutcome(isFailure: true)
                     subject.send(FavoritesDomain(list: [], isLoading: false, error: domainError))
                 }
             }
         } catch {
+            if Task.isCancelled {
+                return
+            }
+            nonFatalCrashlytics(false, error.localizedDescription, domain: .fetch_favorites)
+            throttle.registerOutcome(isFailure: true)
             subject.send(FavoritesDomain(list: [], isLoading: false, error: .unknown(error.localizedDescription)))
         }
     }
     
-    @MainActor
-    private func requestInfoStation(code: String) async throws -> Fav? {
-        if let dto = StationWorker.fetchInfoStation(databaseManager, code: code, date: Date()) {
+    /// Returns the station values for a specific date, using cached DB data when possible.
+    private func requestInfoStation(code: String, date: Date) async throws -> Fav? {
+        if let dto = await MainActor.run(body: {
+            StationWorker.fetchInfoStation(databaseManager, code: code, date: date)
+        }) {
             return Self.mapStationInfo(dto, code: code)
         }
         do {
-            let dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: Date(), store: true)
+            let dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: date, store: true)
             return Self.mapStationInfo(dto, code: code)
         } catch {
             if error is Requester.ErrorReason {
@@ -138,6 +139,59 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                 nonFatalCrashlytics(false, error.localizedDescription)
                 return nil
             }
+        }
+    }
+
+    /// Returns the list of favorite stations with day-by-day values from the start of the current month until today.
+    /// Example: on 2026-01-17 it requests days 1...17 (inclusive).
+    func fetchFavoritesMonthToDate(referenceDate: Date = Date()) async throws -> [FavoritesDomain.StationValues] {
+        struct FavoriteStationInfo: Sendable {
+            let code: String
+            let name: String
+        }
+        let favorites: [FavoriteStationInfo] = try await MainActor.run(body: {
+            let stations = try databaseManager.fetchItems(
+                Model.Station.self,
+                predicate: #Predicate<Model.Station> { $0.isFavorite },
+                sortBy: [SortDescriptor(\Model.Station.name, order: .forward)]
+            )
+            return stations.map { .init(code: $0.code, name: $0.name) }
+        })
+
+        let requestDates = Self.monthToDateDates(referenceDate: referenceDate)
+
+        return try await withThrowingTaskGroup(of: FavoritesDomain.StationValues.self) { group in
+            for station in favorites {
+                group.addTask {
+                    var days: [Fav] = []
+                    days.reserveCapacity(requestDates.count)
+
+                    for date in requestDates {
+                        if let dayValue = try await self.requestInfoStation(code: station.code, date: date) {
+                            days.append(dayValue)
+                        } else {
+                            days.append(
+                                Fav(
+                                    name: station.name,
+                                    maxTemp: "--",
+                                    minTemp: "--",
+                                    rainAcc: "--",
+                                    code: station.code,
+                                    isFavorite: true
+                                )
+                            )
+                        }
+                    }
+                    return FavoritesDomain.StationValues(code: station.code, name: station.name, days: days)
+                }
+            }
+
+            var results: [FavoritesDomain.StationValues] = []
+            results.reserveCapacity(favorites.count)
+            for try await stationValues in group {
+                results.append(stationValues)
+            }
+            return results
         }
     }
     
@@ -174,6 +228,21 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     
     private static func normalized(_ string: String) -> String {
         string.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+    }
+
+    private static func monthToDateDates(referenceDate: Date) -> [Date] {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: referenceDate)
+        guard let year = components.year,
+              let month = components.month,
+              let day = components.day
+        else {
+            return []
+        }
+
+        return (1...day).compactMap { dayOfMonth in
+            calendar.date(from: DateComponents(year: year, month: month, day: dayOfMonth, hour: 12))
+        }
     }
 }
 

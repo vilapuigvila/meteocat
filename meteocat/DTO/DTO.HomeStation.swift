@@ -8,7 +8,7 @@
 import Foundation
 
 extension DTO {
-    struct HomeStation: Decodable, Hashable {
+    struct HomeStation: Decodable, Hashable, Equatable, Sendable {
         let name: String
         let key: String
         let value: String

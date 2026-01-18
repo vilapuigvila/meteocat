@@ -69,16 +69,6 @@ extension HomeStation {
                         .animation(.easeInOut(duration: 0.3), value: showCurrentWeather)
                     
                     if source == .home {
-//                        Rectangle()
-//                            .fill(.ultraThinMaterial)
-//                            .ignoresSafeArea()
-//                            .opacity(showCurrentWeather ? 0.9 : 0)
-//                            .transition(.opacity)
-//                            .animation(.easeInOut(duration: 0.3), value: showCurrentWeather)
-//                            .onTapGesture {
-//                                showCurrentWeather = false
-//                            }
-                        
                         VStack {
                             Spacer()
                             HStack {
@@ -226,6 +216,8 @@ extension HomeStation {
                     
                     Text(selectedDate.formatted(date: .abbreviated, time: .standard))
                         .font(.custom("Poppins-Bold", size: 14))
+                    
+                    buildMonthSummaryView(representable)
                 }
                 .padding(.bottom, 16)
 //                .redacted(reason: isRedacted ? .placeholder : [])
@@ -243,6 +235,56 @@ extension HomeStation {
 //                    .frame(height: 4)
             }
             .frame(maxWidth: .infinity)
+        }
+
+        @ViewBuilder
+        private func buildMonthSummaryView(_ representable: HomeStation.Representable) -> some View {
+            let hasAverageTemp = !representable.averageTemp.isEmpty
+            let hasAccumulatedRain = !representable.accumulatedRain.isEmpty
+            if hasAverageTemp || hasAccumulatedRain {
+                HStack(spacing: 12) {
+                    if hasAverageTemp {
+                        buildSummaryTile(
+                            title: "Mitjana (mes)",
+                            value: representable.averageTemp,
+                            keyForIcon: "Temperatura mitjana"
+                        )
+                    }
+                    if hasAccumulatedRain {
+                        buildSummaryTile(
+                            title: "Acumulada (mes)",
+                            value: representable.accumulatedRain,
+                            keyForIcon: "Precipitació acumulada"
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+            }
+        }
+
+        private func buildSummaryTile(title: String, value: String, keyForIcon: String) -> some View {
+            let icon = color(forKey: keyForIcon)
+            return HStack(spacing: 10) {
+                if let icon {
+                    Image(systemName: icon.imageName)
+                        .foregroundStyle(icon.color)
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.custom("Poppins-Bold", size: 12))
+                        .foregroundStyle(.secondary)
+                    Text(value)
+                        .font(.custom("Poppins-Bold", size: 14))
+                        .foregroundStyle(icon?.color ?? .primary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         
         private func buildRow(key: String, value: String, time: String?, idx: Int) -> some View {
@@ -392,7 +434,11 @@ extension HomeStation {
             name: "Orís",
             code: "CC",
             cityCode: "085121",
-            isFavorite: false, isHome: false))) { _ in
+            isFavorite: false,
+            isHome: false,
+            averageTemp: "14,4°C",
+            accumulatedRain: "123,4 mm"
+        ))) { _ in
                 
             }
         Spacer()

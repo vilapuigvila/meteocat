@@ -100,8 +100,11 @@ func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
         line, code ?? UInt(0)),
         domain: domain.rawValue
     )
+#if DEBUG
     assert(condition(), message())
+#endif
 }
 enum CrashlyticsDomain: String {
     case meteocat
+    case fetch_favorites
 }

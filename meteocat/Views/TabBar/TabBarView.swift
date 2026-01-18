@@ -9,33 +9,10 @@ import SwiftUI
 import Alfy
 
 struct TabBarView: View {
-    
-    private let databaseManager: DatabaseManagerProtocol = {
-        DatabaseManager.makeShared([
-            Model.Station.self, Model.InfoStationByDate.self
-        ])
-    }()
-    private let stationsViewModel: StationsListViewModel
-//    private let forecastViewModel: Forecast.ViewModel<Forecast.InteractorImpl>
-    private let homeViewModel: HomeStationViewModel
-    private let favsViewModel: FavoritesViewModel
+    @StateObject private var viewModel: TabBarViewModel
     
     init(homeStation: PREF.HomeStation? = nil) {
-        /*
-        let _infos = try? databaseManager.fetchItems(Model.InfoStationByDate.self, predicate: nil, sortBy: nil)
-        print("avp [DB] 🚀 on App start total infos - \(_infos?.count ?? -99)")*/
-        homeViewModel = HomeStationViewModel(
-            stationName: nil,
-            interactor: HomeStationInteractorImpl(source: .homeStation, databaseManager: DatabaseManager.shared)
-        )
-        stationsViewModel = StationsListViewModel(
-            interactor: StationsListInteractorImpl(databaseManager: DatabaseManager.shared)
-        )
-        favsViewModel = FavoritesViewModel(interactor: FavoritesInteractorImpl(databaseManager: DatabaseManager.shared))
-        
-//        forecastViewModel = Forecast.ViewModel(
-//            interactor: Forecast.InteractorImpl(databaseManager: databaseManager)
-//        )
+        _viewModel = StateObject(wrappedValue: TabBarViewModel(homeStation: homeStation))
     }
     
     var body: some View {
@@ -50,7 +27,7 @@ struct TabBarView: View {
             }*/
             
             HomeStationView(
-                viewModel: homeViewModel
+                viewModel: viewModel.homeViewModel
             )
             .tabItem {
                 Image(systemName: "thermometer.variable.and.figure.circle.fill")
@@ -58,7 +35,7 @@ struct TabBarView: View {
             }
             
             StationsListView(
-                viewModel: stationsViewModel
+                viewModel: viewModel.stationsViewModel
             )
             .tabItem {
                 Image(systemName: "gearshape.fill")
@@ -66,15 +43,12 @@ struct TabBarView: View {
             }
             
             FavoritesView(
-                viewModel: favsViewModel
+                viewModel: viewModel.favsViewModel
             )
             .tabItem {
                 Image(systemName: "heart.fill")
                 Text("Favs")
             }
-        }
-        .onAppear {
-            print(#function)
         }
     }
 }

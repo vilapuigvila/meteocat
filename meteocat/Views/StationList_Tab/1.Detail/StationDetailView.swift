@@ -64,7 +64,8 @@ private struct InteractorMock: HomeStationInteractorProtocol {
                          DTO.HomeStation(name: "Vic", key: "Pluja", value: "0.0 mm", time: nil, isFavorite: true)],
                     stationCode: "",
                     cityCode: "",
-                    isHome: false
+                    isHome: false,
+                    summary: .init(averageTemp: 12.3, accumulatedRain: 34, firstDate: 0, lastDate: 0)
                 )
             )
 //            subject.send(.loading)

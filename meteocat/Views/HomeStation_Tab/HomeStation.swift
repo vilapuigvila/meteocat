@@ -40,6 +40,8 @@ enum HomeStation: Hashable, Sendable {
         let cityCode: String
         let isFavorite: Bool
         let isHome: Bool
+        let averageTemp: String
+        let accumulatedRain: String
     }
 }
 
