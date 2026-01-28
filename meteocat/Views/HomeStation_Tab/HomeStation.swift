@@ -34,6 +34,13 @@ enum HomeStation: Hashable, Sendable {
             let value: String
             let time: String?
         }
+
+        struct MonthDayValue: Hashable, Sendable {
+            let date: Date
+            let averageTemp: String
+            let accumulatedRain: String
+        }
+
         let values: [Values]
         let name: String
         let code: String
@@ -42,6 +49,7 @@ enum HomeStation: Hashable, Sendable {
         let isHome: Bool
         let averageTemp: String
         let accumulatedRain: String
+        let monthValues: [MonthDayValue]
     }
 }
 

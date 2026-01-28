@@ -55,7 +55,8 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 guard let self else { nonFatalCrashlytics(false, "dataCorrupted"); return }
                 self.subject.send(.loading)
                 
-                let summary = await StationWorker.fetchMonthInfoStation(databaseManager, code: stationCode)
+                let monthInfo = await StationWorker.fetchMonthInfoStation(databaseManager, code: stationCode)
+                let summary = monthInfo.stationDayInfoSummary()
                 
                 if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: stationCode, date: date) {
                     self.subject.send(.loaded(
@@ -63,7 +64,8 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                         stationCode: stationCode,
                         cityCode: cityCode,
                         isHome: self.isHomeStation,
-                        summary: summary.stationDayInfoSummary()
+                        monthInfo: monthInfo,
+                        summary: summary
                     ))
                 } else {
                     do {
@@ -78,7 +80,8 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                             stationCode: stationCode,
                             cityCode: cityCode,
                             isHome: self.isHomeStation,
-                            summary: summary.stationDayInfoSummary()
+                            monthInfo: monthInfo,
+                            summary: summary
                         ))
                     } catch {
                         if error is Requester.ErrorReason {

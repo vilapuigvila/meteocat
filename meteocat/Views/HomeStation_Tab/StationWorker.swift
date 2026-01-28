@@ -8,7 +8,7 @@
 import Foundation
 import Alfy
 
-struct StationDayInfo: Equatable {
+struct StationDayInfo: Hashable, Sendable {
     let date: TimeInterval
     let info: [DTO.HomeStation]
 }
@@ -35,6 +35,42 @@ struct StationWorker {
         code: String,
         date: Date
     ) -> [DTO.HomeStation]? {
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
+        let startOfDayTI = startOfDay.timeIntervalSince1970
+        let endOfDayTI = endOfDay.timeIntervalSince1970
+        let threshold = date.addingTimeInterval(-60*60).timeIntervalSince1970
+        
+        let pred = #Predicate<Model.InfoStationByDate> { info in
+            info.station?.code == code
+            && info.createdAt >= startOfDayTI && info.createdAt < endOfDayTI
+            && info.createdAt > threshold
+        }
+        do {
+            let infos = try database.fetchItems(Model.InfoStationByDate.self, predicate: pred, sortBy: nil)
+            guard let info = infos.first else {
+                print("avp - outdated less than 60 minutes. Should request new one")
+                return nil
+            }
+//            guard let info = infos else {
+//                return nil
+//            }
+            let dto = info.values.map {
+                DTO.HomeStation(
+                    name: $0.name,
+                    key: $0.key,
+                    value: $0.value,
+                    time: $0.time,
+                    isFavorite: info.station?.isFavorite ?? false
+                )
+            }
+            print("avpv - fetch InfoDay from cache")
+            return dto
+        } catch {
+            nonFatalCrashlytics(false, error.localizedDescription)
+            return nil
+        }
+        /*
         guard let info = fetchInfoDayFromDatabase(database, code: code, date: date) else {
             return nil
         }
@@ -48,7 +84,7 @@ struct StationWorker {
             )
         }
         print("avpv - fetch InfoDay from cache")
-        return dto
+        return dto*/
     }
     
     /// all entries from first month date

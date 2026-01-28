@@ -20,18 +20,28 @@ struct HomeStationView: View {
     }
 }
 
+fileprivate enum MonthMetric: String, Identifiable {
+    case averageTemp
+    case accumulatedRain
+
+    var id: String { rawValue }
+}
+
 extension HomeStation {
     
     struct MainView: View /*, DecoupledView*/ {
         enum Source {
             case home, detail, modal
         }
+
         @Environment(\.colorScheme) private var colorScheme
         @Environment(\.scenePhase) private var scenePhase
         
         @State private var showCurrentWeather = false {
             willSet { precondition(source == .home, "Only the ☢️ -> `.home` source supports showing the current weather") }
         }
+
+        @State private var monthMetricSheet: MonthMetric?
         
         @State private var selectedDate = Date()
         @State private var isDatePickerVisible = true
@@ -42,8 +52,10 @@ extension HomeStation {
         let source: Source
         let state: HomeStation.ViewState
         let action: (HomeStation.Action) -> Void
-        
-        var body: some View {
+	
+        private let contentHorizontalPadding: CGFloat = 0
+	
+	        var body: some View {
             ZStack {
                 if case .error(let kind) = state {
                     switch kind {
@@ -67,6 +79,13 @@ extension HomeStation {
                     buildListView(representable)
                         .blur(radius: showCurrentWeather ? 0.999 : 0.0)
                         .animation(.easeInOut(duration: 0.3), value: showCurrentWeather)
+                        .sheet(item: $monthMetricSheet) { metric in
+                            MonthSummarySheet(
+                                metric: metric,
+                                stationName: representable.name,
+                                monthValues: representable.monthValues
+                            )
+                        }
                     
                     if source == .home {
                         VStack {
@@ -131,7 +150,10 @@ extension HomeStation {
         private func buildListView(_ representable: HomeStation.Representable) -> some View {
             VStack {
                 List {
-                    Section(header: buildHeaderView(representable)) {
+                    Section(
+                        header: buildHeaderView(representable)
+                            .listRowInsets(EdgeInsets())
+                    ) {
                         ForEach(representable.values.indices, id: \.self) { idx in
                             let item = representable.values[idx]
                             buildRow(
@@ -144,6 +166,7 @@ extension HomeStation {
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
                 .listRowSeparator(.visible)
             }
         }
@@ -209,30 +232,29 @@ extension HomeStation {
             }
         }
         
-        private func buildHeaderView(_ representable: HomeStation.Representable) -> some View {
-            VStack {
-                VStack {
-                    buildHeaderTitle(representable)
+	        private func buildHeaderView(_ representable: HomeStation.Representable) -> some View {
+	            VStack {
+	                VStack {
+	                    buildHeaderTitle(representable)
                     
                     Text(selectedDate.formatted(date: .abbreviated, time: .standard))
                         .font(.custom("Poppins-Bold", size: 14))
                     
-                    buildMonthSummaryView(representable)
-                }
-                .padding(.bottom, 16)
-//                .redacted(reason: isRedacted ? .placeholder : [])
-
-                DatePicker(
-                    "Select Date",
+	                    buildMonthSummaryView(representable)
+	                }
+	                .padding(.horizontal, contentHorizontalPadding)
+	                .padding(.bottom, 16)
+	//                .redacted(reason: isRedacted ? .placeholder : [])
+	
+	                DatePicker(
+	                    "Select Date",
                     selection: $selectedDate, in: ...Date(),
                     displayedComponents: [.date]
-                )
-                .datePickerStyle(CompactDatePickerStyle())
-                .padding(.bottom, 20)
-                .id(selectedDate.timeIntervalSince1970)
-                
-//                SafariProgressBar()
-//                    .frame(height: 4)
+	                )
+	                .datePickerStyle(CompactDatePickerStyle())
+	                .padding(.horizontal, contentHorizontalPadding)
+	                .padding(.bottom, 20)
+	                .id(selectedDate.timeIntervalSince1970)
             }
             .frame(maxWidth: .infinity)
         }
@@ -249,6 +271,10 @@ extension HomeStation {
                             value: representable.averageTemp,
                             keyForIcon: "Temperatura mitjana"
                         )
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .onTapGesture {
+                            monthMetricSheet = .averageTemp
+                        }
                     }
                     if hasAccumulatedRain {
                         buildSummaryTile(
@@ -256,6 +282,10 @@ extension HomeStation {
                             value: representable.accumulatedRain,
                             keyForIcon: "Precipitació acumulada"
                         )
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .onTapGesture {
+                            monthMetricSheet = .accumulatedRain
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -294,10 +324,10 @@ extension HomeStation {
                         HStack(alignment: .firstTextBaseline) {
                             Image(systemName: values.imageName)
                                 .foregroundStyle(values.color)
-                                .offset(x: -8)
+                                .offset(x: -2)
                             
                             Text("\(key)")
-                                .offset(x: -6)
+                                .padding(.leading, 8)
                             Spacer()
                             
                             Text("\(value)")
@@ -337,8 +367,6 @@ extension HomeStation {
                     showSparks = false
                 }
                 withAnimation {
-//                    fatalError("alffffffff")
-//                    nonFatalCrashlytics(false, "hihi")
                     action(.addToFavs(code: representable.code, isFavorite: !representable.isFavorite))
                 }
             } label: {
@@ -420,6 +448,73 @@ extension HomeStation {
     }
 }
 
+// MARK: - MonthSummarySheet -
+
+private struct MonthSummarySheet: View {
+    let metric: MonthMetric
+    let stationName: String
+    let monthValues: [HomeStation.Representable.MonthDayValue]
+
+    var body: some View {
+        NavigationStack {
+            List(monthValues, id: \.date) { day in
+                HStack(spacing: 12) {
+                    Image(systemName: iconName)
+                        .foregroundStyle(tintColor)
+
+                    Text(day.date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.custom("Poppins-Bold", size: 14))
+
+                    Spacer()
+
+                    Text(value(for: day))
+                        .font(.custom("Poppins-Bold", size: 14))
+                        .foregroundStyle(tintColor)
+                }
+                .padding(.vertical, 6)
+            }
+            .navigationTitle("\(stationName) · \(title)")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var title: String {
+        switch metric {
+        case .averageTemp:
+            return "Mitjana (mes)"
+        case .accumulatedRain:
+            return "Acumulada (mes)"
+        }
+    }
+
+    private var iconName: String {
+        switch metric {
+        case .averageTemp:
+            return "thermometer.medium"
+        case .accumulatedRain:
+            return "cloud.rain"
+        }
+    }
+
+    private var tintColor: Color {
+        switch metric {
+        case .averageTemp:
+            return .green
+        case .accumulatedRain:
+            return .cyan
+        }
+    }
+
+    private func value(for day: HomeStation.Representable.MonthDayValue) -> String {
+        switch metric {
+        case .averageTemp:
+            return day.averageTemp
+        case .accumulatedRain:
+            return day.accumulatedRain
+        }
+    }
+}
+
 #Preview {
     VStack {
         HomeStation.MainView(source: .home, state: .loaded(HomeStation.Representable(
@@ -437,7 +532,14 @@ extension HomeStation {
             isFavorite: false,
             isHome: false,
             averageTemp: "14,4°C",
-            accumulatedRain: "123,4 mm"
+            accumulatedRain: "123,4 mm",
+            monthValues: (1...19).map { day in
+                .init(
+                    date: Calendar.current.date(from: .init(year: 2026, month: 1, day: day)) ?? Date(),
+                    averageTemp: "\(Double.random(in: 8...16).rounded()) °C",
+                    accumulatedRain: "\(Double.random(in: 0...6).rounded()) mm"
+                )
+            }
         ))) { _ in
                 
             }

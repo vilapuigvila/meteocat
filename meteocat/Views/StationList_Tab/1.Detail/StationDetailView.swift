@@ -65,6 +65,7 @@ private struct InteractorMock: HomeStationInteractorProtocol {
                     stationCode: "",
                     cityCode: "",
                     isHome: false,
+                    monthInfo: [],
                     summary: .init(averageTemp: 12.3, accumulatedRain: 34, firstDate: 0, lastDate: 0)
                 )
             )
@@ -87,4 +88,3 @@ private struct InteractorMock: HomeStationInteractorProtocol {
     StationDetaiView(/*stationCode: "",*/ viewModel: vm)
 }
 #endif
-

@@ -25,17 +25,17 @@ enum HomeStationStateDomain: Equatable, Sendable {
     
     case idle
     case loading
-    case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool, summary: StationDayInfoSummary)
+    case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool, monthInfo: [StationDayInfo], summary: StationDayInfoSummary)
     case error(HomeStationInteractorImpl.ErrorReason)
     
     var result: [DTO.HomeStation] {
-        guard case .loaded(let dto, _, _, _, _) = self else {
+        guard case .loaded(let dto, _, _, _, _, _) = self else {
             return []
         }
         return dto
     }
     var stationCode: String {
-        if case .loaded(_, let code, _, _, _) = self {
+        if case .loaded(_, let code, _, _, _, _) = self {
             return code
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -43,7 +43,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var cityCode: String {
-        if case .loaded(_, _, let cityCode, _, _) = self {
+        if case .loaded(_, _, let cityCode, _, _, _) = self {
             return cityCode
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -51,7 +51,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var summuary: StationDayInfoSummary {
-        if case .loaded(_, _, _, _, let summary) = self {
+        if case .loaded(_, _, _, _, _, let summary) = self {
             return summary
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -59,7 +59,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var isHome: Bool {
-        if case .loaded(_, _, _, let isHome, _) = self {
+        if case .loaded(_, _, _, let isHome, _, _) = self {
             return isHome
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -67,7 +67,7 @@ enum HomeStationStateDomain: Equatable, Sendable {
         }
     }
     var isFavorite: Bool {
-        if case .loaded(let dto, _, _, _, _) = self {
+        if case .loaded(let dto, _, _, _, _, _) = self {
             return dto.first?.isFavorite ?? false
         } else {
             nonFatalCrashlytics(false, "dataCorrupted")
@@ -85,8 +85,17 @@ enum HomeStationStateDomain: Equatable, Sendable {
             stationCode: stationCode,
             cityCode: cityCode,
             isHome: isHome ?? self.isHome,
+            monthInfo: monthInfo,
             summary: summuary
         )
+    }
+
+    var monthInfo: [StationDayInfo] {
+        if case .loaded(_, _, _, _, let monthInfo, _) = self {
+            return monthInfo
+        } else {
+            return []
+        }
     }
 }
 
@@ -135,7 +144,7 @@ final class HomeStationViewModel: ObservableObject {
             return .idle
         case .loading:
             return .loading
-        case .loaded(let representable, let stationCode, let cityCode, let isHome, let summary):
+        case .loaded(let representable, let stationCode, let cityCode, let isHome, let monthInfo, let summary):
             print("avvp [HOME STATION VM] - \(dump(representable))")
             let values = representable.map {
                 HomeStation.Representable.Values(key: $0.key, value: $0.value, time: $0.time)
@@ -149,7 +158,8 @@ final class HomeStationViewModel: ObservableObject {
                     isFavorite: representable.first?.isFavorite ?? false,
                     isHome: isHome,
                     averageTemp: summary.averageTemp == nil ? "--" : "\(summary.averageTemp!)",
-                    accumulatedRain: summary.accumulatedRain == nil ? "--" : "\(summary.accumulatedRain!)"
+                    accumulatedRain: summary.accumulatedRain == nil ? "--" : "\(summary.accumulatedRain!)",
+                    monthValues: monthInfo.monthDayValues()
                 )
             )
         case .error(let error):
@@ -210,5 +220,42 @@ extension Array where Element == StationDayInfo {
         let scanner = Scanner(string: candidate)
         scanner.charactersToBeSkipped = CharacterSet(charactersIn: "0123456789.-").inverted
         return scanner.scanDouble()
+    }
+
+    func monthDayValues(referenceDate: Date = Date()) -> [HomeStation.Representable.MonthDayValue] {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: referenceDate)
+        guard let year = components.year,
+              let month = components.month,
+              let day = components.day
+        else {
+            return []
+        }
+
+        var byDay: [DateComponents: StationDayInfo] = [:]
+        byDay.reserveCapacity(self.count)
+
+        for dayInfo in self {
+            let date = Date(timeIntervalSince1970: dayInfo.date)
+            let key = calendar.dateComponents([.year, .month, .day], from: date)
+            byDay[key] = dayInfo
+        }
+
+        return (1...day).compactMap { dayOfMonth in
+            guard let date = calendar.date(from: DateComponents(year: year, month: month, day: dayOfMonth, hour: 12)) else {
+                return nil
+            }
+            let key = DateComponents(year: year, month: month, day: dayOfMonth)
+            let info = byDay[key]?.info ?? []
+
+            let avg = extractValue(forKeyContains: "temperatura mitjana", in: info) ?? "--"
+            let rain = extractValue(forKeyContains: "precipitacio acumulada", in: info) ?? "--"
+            return .init(date: date, averageTemp: avg, accumulatedRain: rain)
+        }
+    }
+
+    private func extractValue(forKeyContains keyFragment: String, in items: [DTO.HomeStation]) -> String? {
+        let fragment = normalize(keyFragment)
+        return items.first { normalize($0.key).contains(fragment) }?.value
     }
 }
