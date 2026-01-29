@@ -13,7 +13,7 @@ protocol FavoritesInteractorProtocol {
     var domain: FavoritesDomain { get }
     var publisher: AnyPublisher<FavoritesDomain, Never> { get }
     func useCase(_ useCase: FavoritesInteractorImpl.UseCase)
-    func fetchFavoritesMonthToDate(referenceDate: Date) async throws -> [FavoritesDomain.StationValues]
+    func fetchFavoritesMonth() async
 }
 
 final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
@@ -26,7 +26,6 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     }
     var domain: FavoritesDomain { subject.value }
     
-//    print("avpv - \(String(describing: interval))")
     private let throttle = RequestThrottleController(minimumInterval: 1, extraRequestsLimit: 2)
     let databaseManager: DatabaseManagerProtocol
     
@@ -144,12 +143,12 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
 
     /// Returns the list of favorite stations with day-by-day values from the start of the current month until today.
     /// Example: on 2026-01-17 it requests days 1...17 (inclusive).
-    func fetchFavoritesMonthToDate(referenceDate: Date = Date()) async throws -> [FavoritesDomain.StationValues] {
+    func fetchFavoritesMonth() async {
         struct FavoriteStationInfo: Sendable {
             let code: String
             let name: String
         }
-        let favorites: [FavoriteStationInfo] = try await MainActor.run(body: {
+        let favorites: [FavoriteStationInfo]? = try? await MainActor.run(body: {
             let stations = try databaseManager.fetchItems(
                 Model.Station.self,
                 predicate: #Predicate<Model.Station> { $0.isFavorite },
@@ -157,41 +156,21 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             )
             return stations.map { .init(code: $0.code, name: $0.name) }
         })
-
-        let requestDates = Self.monthToDateDates(referenceDate: referenceDate)
-
-        return try await withThrowingTaskGroup(of: FavoritesDomain.StationValues.self) { group in
+        guard let favorites else {
+            return nonFatalCrashlytics(false, "no favorites found")
+        }
+        let referenceDate = Date()
+        
+        await withTaskGroup(of: Void.self) { group in
             for station in favorites {
                 group.addTask {
-                    var days: [Fav] = []
-                    days.reserveCapacity(requestDates.count)
-
-                    for date in requestDates {
-                        if let dayValue = try await self.requestInfoStation(code: station.code, date: date) {
-                            days.append(dayValue)
-                        } else {
-                            days.append(
-                                Fav(
-                                    name: station.name,
-                                    maxTemp: "--",
-                                    minTemp: "--",
-                                    rainAcc: "--",
-                                    code: station.code,
-                                    isFavorite: true
-                                )
-                            )
-                        }
-                    }
-                    return FavoritesDomain.StationValues(code: station.code, name: station.name, days: days)
+                    _ = await StationWorker.fetchMonthInfoStation(
+                        self.databaseManager,
+                        code: station.code,
+                        referenceDate: referenceDate
+                    )
                 }
             }
-
-            var results: [FavoritesDomain.StationValues] = []
-            results.reserveCapacity(favorites.count)
-            for try await stationValues in group {
-                results.append(stationValues)
-            }
-            return results
         }
     }
     

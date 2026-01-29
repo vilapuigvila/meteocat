@@ -24,16 +24,19 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
         case .appDidStart:
             guard !Self.didPrefetchFavoritesMonthToDate else { return }
             Self.didPrefetchFavoritesMonthToDate = true
-
+            
             Task(priority: .background) {
+                let startTime = CFAbsoluteTimeGetCurrent()
                 await Self.prefetchFavoritesMonthToDate()
+                let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+                print("avpv - Prefetch completed in \(timeElapsed) seconds")
             }
         }
     }
 
-    private static func prefetchFavoritesMonthToDate(referenceDate: Date = Date()) async {
+    private static func prefetchFavoritesMonthToDate() async {
         let databaseManager = await DatabaseManager.shared
         let favoritesInteractor = FavoritesInteractorImpl(databaseManager: databaseManager)
-        _ = try? await favoritesInteractor.fetchFavoritesMonthToDate(referenceDate: referenceDate)
+        await favoritesInteractor.fetchFavoritesMonth()
     }
 }
