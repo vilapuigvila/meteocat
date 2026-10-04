@@ -1,0 +1,21 @@
+appId: com.pskmoons.meteocat
+---
+# The Radar tab: map with the radar and satellite layers. Needs network. Build without Thread Sanitizer
+# (xcodebuild ... ENABLE_THREAD_SANITIZER=NO) if MapKit's renderer crashes under it in the simulator.
+- launchApp:
+    clearState: true
+- tapOn: "Radar"
+- extendedWaitUntil:
+    visible:
+      id: "map.play"
+    timeout: 30000
+- assertVisible:
+    id: "map.view"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: radar_satellite
+- tapOn:
+    id: "map.infrared"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: radar_infrared

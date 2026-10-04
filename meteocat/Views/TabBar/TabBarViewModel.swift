@@ -19,6 +19,7 @@ final class TabBarViewModel: ObservableObject {
     let stationsViewModel: StationsListViewModel
     let homeViewModel: HomeStationViewModel
     let favsViewModel: FavoritesViewModel
+    let weatherMapViewModel = WeatherMapViewModel()
 
     init(homeStation: PREF.HomeStation? = nil) {
         databaseManager = DatabaseManager.makeShared([

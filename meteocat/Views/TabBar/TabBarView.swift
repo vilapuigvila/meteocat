@@ -50,6 +50,14 @@ struct TabBarView: View {
                 Image(systemName: "heart.fill")
                 Text("Favs")
             }
+
+            WeatherMapView(
+                viewModel: viewModel.weatherMapViewModel
+            )
+            .tabItem {
+                Image(systemName: "cloud.bolt.rain.fill")
+                Text("Radar")
+            }
         }
     }
 }

@@ -28,6 +28,10 @@ struct ServerData {
         case stations(forceRefresh: Bool)
         case requestStation(code: String, date: Date = Date())
         case curentWeather(code: String)
+        /// When the newest radar image was taken, read from the radar page.
+        case radarLatest
+        /// When the newest Meteosat image was taken, read from the WMS capabilities of EUMETView.
+        case satelliteLatest
     }
     static func request<D: Decodable>(_ service: Service) async throws -> D {
         let decodable: Decodable = try await {
@@ -40,6 +44,10 @@ struct ServerData {
                 try await requestStation(code: code, date: date)
             case .curentWeather(let code):
                 try await getCurrentWeather(code: code)
+            case .radarLatest:
+                try await getRadarLatest()
+            case .satelliteLatest:
+                try await getSatelliteLatest()
             }
         }()
         return decodable as! D
@@ -54,6 +62,10 @@ struct ServerData {
         static let currentWeather: TimeInterval = 60 * 5
         /// XEMA readings are half-hourly. No caller yet, so no database rule to mirror.
         static let lastTemperature: TimeInterval = 60 * 30
+        /// Radar images arrive every 6 minutes.
+        static let radarLatest: TimeInterval = 60 * 3
+        /// Meteosat adds an image every 10 minutes.
+        static let satelliteLatest: TimeInterval = 60 * 3
     }
 
     private static let meteocatToken = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
@@ -94,6 +106,18 @@ struct ServerData {
                 .cacheControlBehavior(.ignoreServer)
                 .ttl(CacheTTL.currentWeather)
                 .allowStaleOnError(true)
+        case .radarLatest:
+            return Requester
+                .makeRequest("https://www.meteo.cat/observacions/radar")
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(CacheTTL.radarLatest)
+                .allowStaleOnError(true)
+        case .satelliteLatest:
+            return Requester
+                .makeRequest("https://view.eumetsat.int/geoserver/mtg_fd/wms?service=WMS&version=1.3.0&request=GetCapabilities")
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(CacheTTL.satelliteLatest)
+                .allowStaleOnError(true)
         case .lastTemperature(let stationCode):
             return Requester
                 .makeRequest("https://api.meteo.cat/xema/v1/variables/mesurades/32/ultimes?codiEstacio=\(stationCode)")
@@ -102,6 +126,56 @@ struct ServerData {
                 .ttl(CacheTTL.lastTemperature)
                 .allowStaleOnError(true)
         }
+    }
+
+    private static func getRadarLatest() async throws -> Date {
+        let data = try await makeRequest(for: .radarLatest)
+            .send()
+            .data
+        guard let html = String(data: data, encoding: .utf8), let date = parseRadarTime(html: html) else {
+            nonFatalCrashlytics(false, "radarTimeNotFound")
+            throw Requester.ErrorReason.dataCorrupted
+        }
+        return date
+    }
+
+    /// The radar page carries the time of its newest image in a script: `dataDarreraRadar: '10/04/2026 18:06Z'`
+    /// (month/day/year, UTC).
+    static func parseRadarTime(html: String) -> Date? {
+        let pattern = #"dataDarreraRadar:\s*'(\d{2})/(\d{2})/(\d{4}) (\d{2}):(\d{2})Z'"#
+        guard let match = html.range(of: pattern, options: .regularExpression) else { return nil }
+        let numbers = html[match].split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        guard numbers.count == 5 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return calendar.date(from: DateComponents(
+            year: numbers[2], month: numbers[0], day: numbers[1], hour: numbers[3], minute: numbers[4]
+        ))
+    }
+
+    private static func getSatelliteLatest() async throws -> Date {
+        let data = try await makeRequest(for: .satelliteLatest)
+            .send()
+            .data
+        guard let xml = String(data: data, encoding: .utf8), let date = parseSatelliteTime(capabilities: xml) else {
+            nonFatalCrashlytics(false, "satelliteTimeNotFound")
+            throw Requester.ErrorReason.dataCorrupted
+        }
+        return date
+    }
+
+    /// The `time` dimension of the GeoColour layer reads `start/end/PT10M`; the end is the newest image.
+    static func parseSatelliteTime(capabilities: String) -> Date? {
+        guard let layer = capabilities.range(of: "<Name>rgb_geocolour</Name>") else { return nil }
+        let rest = capabilities[layer.upperBound...]
+        let pattern = #"<Dimension[^>]*name="time"[^>]*>[^<]*/(\d{4}-\d{2}-\d{2}T[\d:.]+Z)/PT\d+M</Dimension>"#
+        guard let dimension = rest.range(of: pattern, options: .regularExpression),
+              let end = rest[dimension].range(of: #"\d{4}-\d{2}-\d{2}T[\d:.]+Z(?=/PT)"#, options: .regularExpression)
+        else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: String(rest[dimension][end]))
+            ?? ISO8601DateFormatter().date(from: String(rest[dimension][end]))
     }
 
     private static func getCurrentWeather(code: String) async throws -> DTO.CurrentWeather {
