@@ -65,6 +65,9 @@ extension HomeStation {
                     case .networkFailure:
                         NetworkFailureErrorView()
                             .transition(.opacity)
+                    case .noData:
+                        NoDataErrorView()
+                            .transition(.opacity)
                     }
                 }
                 if case .idle = state {
@@ -83,7 +86,8 @@ extension HomeStation {
                             MonthSummarySheet(
                                 metric: metric,
                                 stationName: representable.name,
-                                monthValues: representable.monthValues
+                                monthValues: representable.monthValues,
+                                missingDays: representable.missingDays
                             )
                         }
                     
@@ -454,24 +458,36 @@ private struct MonthSummarySheet: View {
     let metric: MonthMetric
     let stationName: String
     let monthValues: [HomeStation.Representable.MonthDayValue]
+    let missingDays: Int
 
     var body: some View {
         NavigationStack {
-            List(monthValues, id: \.date) { day in
-                HStack(spacing: 12) {
-                    Image(systemName: iconName)
-                        .foregroundStyle(tintColor)
+            List {
+                Section {
+                    ForEach(monthValues, id: \.date) { day in
+                        HStack(spacing: 12) {
+                            Image(systemName: iconName)
+                                .foregroundStyle(tintColor)
 
-                    Text(day.date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.custom("Poppins-Bold", size: 14))
+                            Text(day.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.custom("Poppins-Bold", size: 14))
 
-                    Spacer()
+                            Spacer()
 
-                    Text(value(for: day))
-                        .font(.custom("Poppins-Bold", size: 14))
-                        .foregroundStyle(tintColor)
+                            if day.isPartial {
+                                Text("parcial")
+                                    .font(.custom("Poppins-Bold", size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(value(for: day))
+                                .font(.custom("Poppins-Bold", size: 14))
+                                .foregroundStyle(tintColor)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                } footer: {
+                    Text(footerText)
                 }
-                .padding(.vertical, 6)
             }
             .navigationTitle("\(stationName) · \(title)")
             .navigationBarTitleDisplayMode(.inline)
@@ -485,6 +501,17 @@ private struct MonthSummarySheet: View {
         case .accumulatedRain:
             return "Acumulada (mes)"
         }
+    }
+
+    private var footerText: String {
+        var lines: [String] = []
+        if metric == .averageTemp, monthValues.contains(where: \.isPartial) {
+            lines.append("La mitjana no inclou el dia en curs (dades parcials).")
+        }
+        if missingDays > 0 {
+            lines.append("\(missingDays) dies sense dades.")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var iconName: String {
@@ -537,9 +564,11 @@ private struct MonthSummarySheet: View {
                 .init(
                     date: Calendar.current.date(from: .init(year: 2026, month: 1, day: day)) ?? Date(),
                     averageTemp: "\(Double.random(in: 8...16).rounded()) °C",
-                    accumulatedRain: "\(Double.random(in: 0...6).rounded()) mm"
+                    accumulatedRain: "\(Double.random(in: 0...6).rounded()) mm",
+                    isPartial: day == 19
                 )
-            }
+            },
+            missingDays: 0
         ))) { _ in
                 
             }

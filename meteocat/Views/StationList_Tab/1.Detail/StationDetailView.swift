@@ -66,7 +66,7 @@ private struct InteractorMock: HomeStationInteractorProtocol {
                     cityCode: "",
                     isHome: false,
                     monthInfo: [],
-                    summary: .init(averageTemp: 12.3, accumulatedRain: 34, firstDate: 0, lastDate: 0)
+                    summary: .init(averageTemp: 12.3, accumulatedRain: 34, daysWithData: 1, daysExpected: 1)
                 )
             )
 //            subject.send(.loading)

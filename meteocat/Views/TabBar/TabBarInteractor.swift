@@ -25,7 +25,7 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
             guard !Self.didPrefetchFavoritesMonthToDate else { return }
             Self.didPrefetchFavoritesMonthToDate = true
             
-            Task(priority: .background) {
+            Task.detached(priority: .background) {
                 let startTime = CFAbsoluteTimeGetCurrent()
                 await Self.prefetchFavoritesMonthToDate()
                 let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
@@ -36,6 +36,7 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
 
     private static func prefetchFavoritesMonthToDate() async {
         let databaseManager = await DatabaseManager.shared
+        await StationWorker.purgeLegacyCache(databaseManager)
         let favoritesInteractor = FavoritesInteractorImpl(databaseManager: databaseManager)
         await favoritesInteractor.fetchFavoritesMonth()
     }

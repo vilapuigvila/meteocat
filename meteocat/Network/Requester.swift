@@ -261,81 +261,30 @@ struct ServerData {
 /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 extension ServerData {
-    
+
+    enum ResponseError: Error, Equatable {
+        /// The page has no daily summary table: the server has nothing for that day (yet).
+        case noDailyData
+    }
+
+    /// The daily summary of the UTC day with the same year-month-day as `date`'s (see `DayKey`).
     static func requestStation(code: String, date: Date) async throws -> [DTO.HomeStation] {
         nonFatalCrashlytics(!code.isEmpty, "")
-//        let value = await getLastTemperature(forStationCode: "CC")
-//        print("avpv - \(value)")
-        
-        /*
+
+        let day = DayKey(date)
+
         do {
-            let data = try await Requester.request("https://www.meteo.cat/observacions/xema").data
-            guard let htmlContent = String(data: data, encoding: .utf8) else {
-                throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
-            }
-            let document = try SwiftSoup.parse(htmlContent)
-            print("avpv - \(document)")
-        } catch {
-            nonFatalCrashlytics(false, "dataCorrupted")
-        }*/
-        
-        let formattedDate = dateFormatterForRequestStation(date) // 2025-02-01T07:00Z
-        
-        do {
+            // meteo.cat lets clients cache this page for 5 minutes, well under `DayKey.settleDelay`,
+            // so a page served from the URL cache can't make a day look finished when it isn't.
             let data = try await Requester
-                .request("https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(formattedDate)")
+                .request("https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(day.requestParameter)")
                 .data
             guard let htmlContent = String(data: data, encoding: .utf8) else {
                 throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)
             }
-            let document = try SwiftSoup.parse(htmlContent)
-            
-            let stationName: String = {
-                guard let fitxa = try? document.select("#fitxa-ema").first(),
-                      let value = try? fitxa.select("h2").first()?.text() ?? "not found"
-                else {
-                    return "not found"
-                }
-                return value
-            }()
-            
-            // Step 4: Select the table with the "Resum diari" data (the first <table> element)
-            guard let table = try document.select("table").first() else {
-                throw NSError(domain: "Invalid HTML structure", code: 0, userInfo: nil)
-            }
-            var items: [DTO.HomeStation] = []
-            
-            // Step 5: Select all rows in the table (excluding the header)
-            let rows = try table.select("tr")
-            
-            for row in rows {
-                // Get the columns (either <th> for title or <td> for values)
-                let columns = try row.select("th, td")
-                
-                // Skip rows with no useful data
-                if columns.isEmpty() { continue }
-
-                if columns.size() == 2 {
-                    let title = try columns.get(0).text()
-                    let value = try columns.get(1).text()
-                    
-                    // Step 6: Print the title and value in the desired format
-//                    print("\(title)\t\(value)")
-                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: nil))
-                }
-                
-                // Extract the title (first column) and value (second column)
-                if columns.size() == 3 {
-                    let title = try columns.get(0).text()
-                    let value = try columns.get(1).text()
-                    let value2 = try columns.get(2).text()
-                    
-                    items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: value2))
-                }
-            }
-            return items
+            return try parseDailySummary(html: htmlContent)
         } catch {
-            if error is Requester.ErrorReason {
+            if error is Requester.ErrorReason || error is ResponseError || error is CancellationError {
                 throw error
             } else {
                 guard let urlError = error as? URLError else {
@@ -346,8 +295,8 @@ extension ServerData {
                 case .notConnectedToInternet:
                     throw Requester.ErrorReason.noInternetConnection
                 case .cancelled:
-                    nonFatalCrashlytics(false, "dataCorrupted")
-                    throw Requester.ErrorReason.generic(statusCode: 500)
+                    // A screen went away or a newer request replaced this one: not a failure.
+                    throw CancellationError()
                 default:
                     nonFatalCrashlytics(false, "dataCorrupted")
                     throw Requester.ErrorReason.dataCorrupted
@@ -355,17 +304,46 @@ extension ServerData {
             }
         }
     }
-}
 
-// MARK: - DateFormatter Helpers -
+    /// Rows of the "Dades diàries" table of `/observacions/xema/dades`: title, value and, for some rows, the time.
+    static func parseDailySummary(html: String) throws -> [DTO.HomeStation] {
+        let document = try SwiftSoup.parse(html)
 
-extension ServerData {
-    private static var dateFormatter: DateFormatter = {
-        DateFormatter()
-    }()
-    private static let dateFormatterForRequestStation: (Date) -> String = { date in
-        let currentDate = date
-        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
-        return dateFormatter.string(from: currentDate)
+        let stationName: String = {
+            guard let fitxa = try? document.select("#fitxa-ema").first(),
+                  let value = try? fitxa.select("h2").first()?.text() ?? "not found"
+            else {
+                return "not found"
+            }
+            return value
+        }()
+
+        // The daily summary is the first table. When the server has nothing for the day the page has no table
+        // or, at most, the station metadata one, which must not be read as measurements.
+        guard let table = try document.select("table").first(),
+              !(try table.select("caption").text().localizedCaseInsensitiveContains("metadades"))
+        else {
+            throw ResponseError.noDailyData
+        }
+        var items: [DTO.HomeStation] = []
+
+        for row in try table.select("tr") {
+            // Either <th> for the title or <td> for values
+            let columns = try row.select("th, td")
+
+            if columns.size() == 2 {
+                let title = try columns.get(0).text()
+                let value = try columns.get(1).text()
+                items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: nil))
+            }
+
+            if columns.size() == 3 {
+                let title = try columns.get(0).text()
+                let value = try columns.get(1).text()
+                let time = try columns.get(2).text()
+                items.append(DTO.HomeStation(name: stationName, key: title, value: value, time: time))
+            }
+        }
+        return items
     }
 }

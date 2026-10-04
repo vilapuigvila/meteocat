@@ -50,48 +50,46 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 subject.send(.error(.missingCode))
                 return
             }
-            
-            Task { @MainActor [weak self] in
+            // A newer request replaces the one in progress: its answer must not overwrite ours.
+            cancel()
+            taskRequestStation = Task { @MainActor [weak self] in
                 guard let self else { nonFatalCrashlytics(false, "dataCorrupted"); return }
                 self.subject.send(.loading)
                 
-                let monthInfo = await StationWorker.fetchMonthInfoStation(databaseManager, code: stationCode)
-                let summary = monthInfo.stationDayInfoSummary()
-                
-                if let dto = StationWorker.fetchInfoStation(self.databaseManager, code: stationCode, date: date) {
-                    self.subject.send(.loaded(
-                        dto: dto,
-                        stationCode: stationCode,
-                        cityCode: cityCode,
-                        isHome: self.isHomeStation,
-                        monthInfo: monthInfo,
-                        summary: summary
-                    ))
-                } else {
-                    do {
-                        let dto = try await StationWorker.requestInfoStation(
-                            self.databaseManager,
-                            code: stationCode,
-                            date: date,
-                            store: true
-                        )
-                        self.subject.send(.loaded(
-                            dto: dto,
-                            stationCode: stationCode,
-                            cityCode: cityCode,
-                            isHome: self.isHomeStation,
-                            monthInfo: monthInfo,
-                            summary: summary
-                        ))
-                    } catch {
-                        if error is Requester.ErrorReason {
-                            self.subject.send(.error(.unknown(error.localizedDescription)))
-                        } else {
-                            nonFatalCrashlytics(false, error.localizedDescription)
-                            self.subject.send(.error(.unknown(error.localizedDescription)))
-                        }
-                    }
+                // Show the requested day as soon as we have it, not after the whole month has been downloaded.
+                let dto: [DTO.HomeStation]
+                do {
+                    dto = try await self.loadDay(code: stationCode, date: date)
+                } catch {
+                    guard !Task.isCancelled, !(error is CancellationError) else { return }
+                    self.subject.send(.error(Self.errorReason(for: error)))
+                    return
                 }
+                guard !Task.isCancelled else { return }
+                
+                let referenceDate = Date()
+                let stored = StationWorker.cachedMonthInfoStation(
+                    self.databaseManager,
+                    code: stationCode,
+                    referenceDate: referenceDate
+                )
+                self.subject.send(.loaded(
+                    dto: dto,
+                    stationCode: stationCode,
+                    cityCode: cityCode,
+                    isHome: self.isHomeStation,
+                    monthInfo: stored,
+                    summary: stored.summary(referenceDate: referenceDate)
+                ))
+                
+                let monthInfo = await StationWorker.fetchMonthInfoStation(
+                    self.databaseManager,
+                    code: stationCode,
+                    referenceDate: referenceDate
+                )
+                guard !Task.isCancelled else { return }
+                // From the current state, so a favourite toggled meanwhile isn't undone.
+                self.subject.send(self.domain.withMonth(monthInfo, summary: monthInfo.summary(referenceDate: referenceDate)))
             }
         case .addToFavs(let code, let isFav):
             Task {
@@ -110,6 +108,34 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             }
             let _domain = domain.copy(isHome: isHomeStation)
             subject.send(_domain)
+        }
+    }
+    
+    /// Stored values when still valid, the network otherwise. The favourite flag always comes from the database:
+    /// the network response doesn't know it.
+    @MainActor
+    private func loadDay(code: String, date: Date) async throws -> [DTO.HomeStation] {
+        let dto: [DTO.HomeStation]
+        if let stored = StationWorker.fetchInfoStation(databaseManager, code: code, date: date) {
+            dto = stored
+        } else {
+            dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: date, store: true)
+        }
+        let isFavorite = StationWorker.isFavorite(databaseManager, code: code)
+        return dto.map { $0.copyWithIsFavorite(isFavorite) }
+    }
+    
+    private static func errorReason(for error: Error) -> ErrorReason {
+        switch error {
+        case StationWorker.ErrorReason.noData:
+            return .noData
+        case Requester.ErrorReason.noInternetConnection:
+            return .noInternetConnection
+        default:
+            if !(error is Requester.ErrorReason) {
+                nonFatalCrashlytics(false, error.localizedDescription)
+            }
+            return .unknown(error.localizedDescription)
         }
     }
     

@@ -76,6 +76,31 @@ struct NetworkFailureErrorView: View {
     }
 }
 
+/// The server has no values for the day: it hasn't started there yet, or the station sent nothing.
+struct NoDataErrorView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "calendar.badge.clock")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
+                .foregroundColor(.orange)
+
+            Text("No data for this day yet.")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(radius: 4)
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
 // MARK: - Preview
 /*
 struct ErrorViews_Previews: PreviewProvider {

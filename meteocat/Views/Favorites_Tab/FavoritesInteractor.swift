@@ -128,6 +128,9 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             let dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: date, store: true)
             return Self.mapStationInfo(dto, code: code)
         } catch {
+            if error is StationWorker.ErrorReason || error is CancellationError {
+                return nil
+            }
             if error is Requester.ErrorReason {
                 guard case Requester.ErrorReason.noInternetConnection = error else {
                     nonFatalCrashlytics(false, error.localizedDescription)
