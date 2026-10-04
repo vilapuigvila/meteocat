@@ -183,6 +183,7 @@ extension HomeStation {
                         .fontWeight(.bold)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, maxHeight: 44)
+                        .accessibilityIdentifier("station.title")
                 case .modal:
                     buildModalCaseView(representable)
                 case .detail:
@@ -200,6 +201,7 @@ extension HomeStation {
                     .lineLimit(2)
                     .font(.custom("san francisco display", size: 28))
                     .fontWeight(.bold)
+                    .accessibilityIdentifier("station.title")
                 
                 Spacer()
                 
@@ -222,6 +224,7 @@ extension HomeStation {
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("station.title")
                     
                     // Invisible spacer for symmetry
                     Spacer()
@@ -259,8 +262,11 @@ extension HomeStation {
 	                .padding(.horizontal, contentHorizontalPadding)
 	                .padding(.bottom, 20)
 	                .id(selectedDate.timeIntervalSince1970)
+	                .accessibilityIdentifier("station.datePicker")
             }
             .frame(maxWidth: .infinity)
+            // The sheet has no navigation bar: without this the title sits on the grabber and the heart in the corner.
+            .padding(.top, source == .modal ? Sizes.contentMargin : 0)
         }
 
         @ViewBuilder
@@ -380,7 +386,6 @@ extension HomeStation {
                         .scaledToFit()
                         .foregroundStyle(colorScheme == .dark ? .white : .black)
                         .frame(width: Sizes.iconSize, height: Sizes.iconSize)
-                        .padding(.horizontal, 4)
                         .animation(.spring(), value: representable.isFavorite)
                     
                     if showSparks, source != .home {
@@ -390,8 +395,10 @@ extension HomeStation {
                     }
                 }
             }
-            .frame(width: 44, height: 44)
-            .offset(x: -20)
+            .frame(width: Sizes.touchSize, height: Sizes.touchSize)
+            // Keep the 44 pt touch target but lay out only the glyph, so it sits on the content margin
+            .padding(.horizontal, -(Sizes.touchSize - Sizes.iconSize) / 2)
+            .accessibilityIdentifier("station.favoriteButton")
         }
 
         private func buildHomeButton(_ representable: HomeStation.Representable) -> some View {
@@ -409,12 +416,12 @@ extension HomeStation {
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(representable.isHome ? Color.green.opacity(0.5) : Color.gray)
-                    .frame(width: 24, height: 24)
-                    .padding(.horizontal, 4)
+                    .frame(width: Sizes.iconSize, height: Sizes.iconSize)
                     .animation(.spring(), value: representable.isHome)
             }
-            .frame(width: 44, height: 44)
-            .offset(x: 20)
+            .frame(width: Sizes.touchSize, height: Sizes.touchSize)
+            .padding(.horizontal, -(Sizes.touchSize - Sizes.iconSize) / 2)
+            .accessibilityIdentifier("station.homeButton")
         }
         private func feedbackGenerator(success: Bool) {
             let generator = UINotificationFeedbackGenerator()
@@ -448,6 +455,8 @@ extension HomeStation {
         
         private enum Sizes {
             static let iconSize: CGFloat = 24
+            static let touchSize: CGFloat = 44
+            static let contentMargin: CGFloat = 16
         }
     }
 }

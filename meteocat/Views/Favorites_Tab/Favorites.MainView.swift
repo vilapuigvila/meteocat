@@ -112,6 +112,7 @@ extension Favorites {
                 .padding(12)
                 .background(Color.blue.opacity(0.3))
                 .cornerRadius(8)
+                .accessibilityIdentifier("favorites.card.\(item.stationCode)")
         }
     }
 }

@@ -22,6 +22,8 @@ xcodebuild test -project meteocat.xcodeproj -scheme meteocat -destination 'platf
 # one class: add  -only-testing:meteocatTests/StationMonthTests
 ```
 
+UI flow (Maestro, needs network, wipes app state): with `Claude-Test` booted and the app installed, run `maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/favorites_detail_modal.yaml`; the screenshot lands under `<dir>`.
+
 Tests cover the day/cache rules, the month maths, the HTML parsing and the SwiftData cache (against an in-memory database). Adjust simulator names to what `xcrun simctl list devices` shows locally.
 
 `GoogleService-Info.plist` is checked in and `FirebaseApp.configure()` runs at launch (`meteocatApp.swift`), so Crashlytics is always active.

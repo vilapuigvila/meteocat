@@ -152,6 +152,7 @@ extension StationsList {
                 .cornerRadius(8)
                 .shadow(radius: 2)
             }
+            .accessibilityIdentifier("stations.row.\(item.code)")
         }
         
         /*

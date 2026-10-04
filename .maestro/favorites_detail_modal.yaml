@@ -1,0 +1,57 @@
+# Favourites modal: favourite Orís (CC) from the Stations tab, then open it from Favs.
+# Needs network (meteo.cat). Run against the booted Claude-Test simulator:
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/favorites_detail_modal.yaml
+# The screenshot lands in <dir>/<timestamp>/favorites_detail_modal/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+- clearState
+- launchApp
+
+# Stations tab: search and open Orís
+- tapOn: "Stations"
+- extendedWaitUntil:
+    visible: "Estacions"
+    timeout: 60000
+- tapOn: "Search stations"
+- inputText: "Orís"
+- extendedWaitUntil:
+    visible:
+      id: "stations.row.CC"
+    timeout: 30000
+- tapOn:
+    id: "stations.row.CC"
+
+# Station detail: favourite it
+- extendedWaitUntil:
+    visible:
+      id: "station.favoriteButton"
+    timeout: 60000
+- tapOn:
+    id: "station.favoriteButton"
+
+# Favs tab: open the card
+- tapOn: "Favs"
+- extendedWaitUntil:
+    visible:
+      id: "favorites.card.CC"
+    timeout: 60000
+- tapOn:
+    id: "favorites.card.CC"
+
+# Modal content (month tiles come from the network)
+- extendedWaitUntil:
+    visible:
+      id: "station.title"
+    timeout: 60000
+- assertVisible:
+    id: "station.title"
+    text: "Orís"
+- extendedWaitUntil:
+    visible: "Mitjana (mes)"
+    timeout: 90000
+- assertVisible: "Mitjana (mes)"
+- assertVisible: "Acumulada (mes)"
+- assertVisible:
+    id: "station.datePicker"
+- waitForAnimationToEnd
+- takeScreenshot: favorites_detail_modal
