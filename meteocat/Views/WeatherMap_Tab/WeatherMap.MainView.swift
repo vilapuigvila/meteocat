@@ -2,7 +2,7 @@
 //  WeatherMap.MainView.swift
 //  meteocat
 //
-//  Rain radar over a satellite image of Catalonia, with the last hour of radar as an animation.
+//  Rain radar over a map of Catalonia (RainViewer), with the last two hours as an animation.
 //
 
 import SwiftUI
@@ -12,34 +12,41 @@ struct WeatherMapView: View {
 
     @ObservedObject var viewModel: WeatherMapViewModel
 
+    /// Where the user is, and whether the map is on screen: the location is only read while it is.
+    @State private var isVisible = false
+    @State private var hasLocation = false
+    @State private var recenterCount = 0
+
     var body: some View {
         VStack(spacing: 0) {
             buildHeader()
             ZStack(alignment: .bottom) {
                 WeatherMapRepresentable(
-                    satellite: viewModel.satellite,
-                    satelliteTime: viewModel.satelliteTime,
+                    host: viewModel.host,
                     frames: viewModel.frames,
                     selectedFrame: viewModel.currentFrame,
-                    showsRadar: viewModel.showsRadar
+                    showsRadar: viewModel.showsRadar,
+                    isActive: isVisible,
+                    recenterCount: recenterCount,
+                    hasLocation: $hasLocation
                 )
                 .ignoresSafeArea(edges: .bottom)
+                if hasLocation {
+                    buildLocateButton()
+                }
                 if viewModel.frames.isEmpty {
-                    SignalLoader(.compact, caption: "Loading radar")
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Signal.paper)
-                        .overlay(Rectangle().stroke(Signal.ink, lineWidth: 1))
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .padding(.top, 16)
-                        .transition(.opacity)
+                    buildStatus()
                 }
                 buildControls()
             }
         }
         .background(Signal.paper.ignoresSafeArea())
         .task { await viewModel.load() }
-        .onDisappear { viewModel.pause() }
+        .onAppear { isVisible = true }
+        .onDisappear {
+            isVisible = false
+            viewModel.pause()
+        }
     }
 
     // MARK: Header
@@ -59,44 +66,84 @@ struct WeatherMapView: View {
 
     /// The time of the image on screen, local.
     private var timeText: String? {
-        viewModel.currentFrame.map { $0.formatted(.dateTime.day().month(.abbreviated).hour().minute()) }
-    }
-
-    /// The source of each image on the map, with the time of the satellite one.
-    private var attribution: String {
-        guard viewModel.satellite != nil, let time = viewModel.satelliteTime else { return "Radar: Meteocat" }
-        return "Satellite \(time.formatted(.dateTime.hour().minute())): EUMETSAT · Radar: Meteocat"
+        viewModel.currentFrame.map { $0.time.formatted(.dateTime.day().month(.abbreviated).hour().minute()) }
     }
 
     // MARK: Controls
 
+    /// Over the map until the first images arrive: the loader, or why there are none.
+    @ViewBuilder
+    private func buildStatus() -> some View {
+        Group {
+            if viewModel.failed {
+                HStack(spacing: 12) {
+                    Text("Radar unavailable")
+                        .font(Signal.kicker)
+                        .tracking(1.4)
+                        .textCase(.uppercase)
+                    Button("Retry") {
+                        Task { await viewModel.load() }
+                    }
+                    .font(Signal.kicker)
+                    .tracking(1.4)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Signal.orange)
+                    .accessibilityIdentifier("map.retry")
+                }
+                .foregroundStyle(Signal.ink)
+            } else {
+                SignalLoader(.compact, caption: "Loading radar")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Signal.paper)
+        .overlay(Rectangle().stroke(Signal.ink, lineWidth: 1))
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.top, 16)
+    }
+
+    /// Brings the map back to the user after panning it.
+    private func buildLocateButton() -> some View {
+        Button {
+            recenterCount += 1
+        } label: {
+            Image(systemName: "location.fill")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .foregroundStyle(Signal.ink)
+                .background(Signal.paper)
+                .overlay(Rectangle().stroke(Signal.ink, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Center on my location")
+        .accessibilityIdentifier("map.locate")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(16)
+    }
+
     private func buildControls() -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                WeatherMapChip(title: "Satellite", isOn: viewModel.satellite == .colour, id: "map.satellite") {
-                    viewModel.satellite = .colour
-                }
-                WeatherMapChip(title: "Infrared", isOn: viewModel.satellite == .infrared, id: "map.infrared") {
-                    viewModel.satellite = .infrared
-                }
-                WeatherMapChip(title: "Map", isOn: viewModel.satellite == nil, id: "map.plain") {
-                    viewModel.satellite = nil
-                }
-                Spacer(minLength: 0)
-                WeatherMapChip(title: "Radar", isOn: viewModel.showsRadar, signal: true, id: "map.radar") {
-                    viewModel.showsRadar.toggle()
-                }
+            WeatherMapChip(title: "Radar", isOn: viewModel.showsRadar, id: "map.radar") {
+                viewModel.showsRadar.toggle()
             }
 
             if viewModel.showsRadar, viewModel.frames.count > 1 {
                 buildTimeline()
             }
 
-            Text(attribution)
-                .font(Signal.caption)
-                .foregroundStyle(Signal.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            // RainViewer's terms ask for a mention of the source with a link
+            HStack(spacing: 6) {
+                Text("Radar:")
+                    .foregroundStyle(Signal.muted)
+                if let url = URL(string: "https://www.rainviewer.com/api.html") {
+                    Link("RainViewer", destination: url)
+                        .underline()
+                        .foregroundStyle(Signal.ink)
+                        .accessibilityIdentifier("map.source")
+                }
+            }
+            .font(Signal.caption)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,7 +163,7 @@ struct WeatherMapView: View {
                     .background(Signal.orange)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play last hour")
+            .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play last two hours")
             .accessibilityIdentifier("map.play")
 
             Slider(
@@ -132,10 +179,10 @@ struct WeatherMapView: View {
             )
             .tint(Signal.orange)
             .accessibilityLabel("Radar time")
-            .accessibilityValue(viewModel.currentFrame.map { $0.formatted(.dateTime.hour().minute()) } ?? "")
+            .accessibilityValue(viewModel.currentFrame.map { $0.time.formatted(.dateTime.hour().minute()) } ?? "")
             .accessibilityIdentifier("map.slider")
 
-            Text(viewModel.currentFrame?.formatted(.dateTime.hour().minute()) ?? "--:--")
+            Text(viewModel.currentFrame?.time.formatted(.dateTime.hour().minute()) ?? "--:--")
                 .font(Signal.figureSmall)
                 .foregroundStyle(Signal.ink)
                 .frame(width: 58, alignment: .trailing)
@@ -143,11 +190,10 @@ struct WeatherMapView: View {
     }
 }
 
-/// A square toggle: filled with ink when on, or with orange for the radar.
+/// A square toggle: filled with orange when on.
 private struct WeatherMapChip: View {
     let title: String
     let isOn: Bool
-    var signal = false
     let id: String
     let action: () -> Void
 
@@ -160,9 +206,9 @@ private struct WeatherMapChip: View {
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .frame(minHeight: 36)
-                .foregroundStyle(isOn ? (signal ? Signal.onSignal : Signal.paper) : Signal.ink)
-                .background(isOn ? (signal ? Signal.orange : Signal.ink) : Color.clear)
-                .overlay(Rectangle().stroke(isOn && signal ? Signal.orange : Signal.ink, lineWidth: 1))
+                .foregroundStyle(isOn ? Signal.onSignal : Signal.ink)
+                .background(isOn ? Signal.orange : Color.clear)
+                .overlay(Rectangle().stroke(isOn ? Signal.orange : Signal.ink, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])
@@ -173,11 +219,15 @@ private struct WeatherMapChip: View {
 // MARK: - MapKit -
 
 private struct WeatherMapRepresentable: UIViewRepresentable {
-    let satellite: WeatherMapTiles.Satellite?
-    let satelliteTime: Date?
-    let frames: [Date]
-    let selectedFrame: Date?
+    let host: String
+    let frames: [RadarFrame]
+    let selectedFrame: RadarFrame?
     let showsRadar: Bool
+    /// The map is on screen: only then the user location and the compass are read.
+    let isActive: Bool
+    /// Each change brings the map back to the user.
+    let recenterCount: Int
+    @Binding var hasLocation: Bool
 
     /// Catalonia, with room around it.
     private static let start = MKCoordinateRegion(
@@ -209,47 +259,51 @@ private struct WeatherMapRepresentable: UIViewRepresentable {
         context.coordinator.apply(self, to: map)
     }
 
-    final class Coordinator: NSObject, MKMapViewDelegate {
-        private var satelliteOverlay: SatelliteTileOverlay?
+    final class Coordinator: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
         private var radarOverlays: [RadarTileOverlay] = []
-        private var renderers: [Date: MKTileOverlayRenderer] = [:]
-        private var selectedFrame: Date?
+        private var radarHost = ""
+        private var renderers: [RadarFrame: MKTileOverlayRenderer] = [:]
+        private var selectedFrame: RadarFrame?
         private var showsRadar = true
+
+        // the user: where, which way the phone points
+        private let compass = CLLocationManager()
+        private var userView: HeadingLocationView?
+        private var heading: Double?
+        private var didCenter = false
+        private var handledRecenter = 0
+        private var hasLocation: Binding<Bool>?
+
+        override init() {
+            super.init()
+            compass.delegate = self
+            compass.headingFilter = 3
+        }
 
         /// Every radar image stays on the map, only the chosen one is visible, so stepping through the hour doesn't reload tiles.
         func apply(_ parent: WeatherMapRepresentable, to map: MKMapView) {
-            let wanted = parent.satelliteTime.flatMap { time in parent.satellite.map { ($0, time) } }
-            if wanted?.0 != satelliteOverlay?.satellite || wanted?.1 != satelliteOverlay?.time {
-                if let old = satelliteOverlay {
-                    map.removeOverlay(old)
-                    satelliteOverlay = nil
-                }
-                if let (satellite, time) = wanted {
-                    let overlay = SatelliteTileOverlay(satellite, time: time)
-                    // below the radar, and below the place names
-                    map.insertOverlay(overlay, at: 0, level: .aboveRoads)
-                    satelliteOverlay = overlay
-                }
-            }
-
             // before the overlays are added: MapKit asks for each renderer, and its alpha, at that moment
             selectedFrame = parent.selectedFrame
             showsRadar = parent.showsRadar
 
-            if parent.frames != radarOverlays.map(\.time) {
+            if parent.frames != radarOverlays.map(\.frame) || parent.host != radarHost {
                 map.removeOverlays(radarOverlays)
                 renderers = [:]
-                radarOverlays = parent.frames.map(RadarTileOverlay.init(time:))
+                radarHost = parent.host
+                radarOverlays = parent.frames.map { RadarTileOverlay(frame: $0, host: parent.host) }
                 for overlay in radarOverlays {
                     map.addOverlay(overlay, level: .aboveRoads)
                 }
             }
 
+            hasLocation = parent.$hasLocation
+            applyUser(parent, to: map)
+
             for overlay in radarOverlays {
-                overlay.isCurrent = overlay.time == selectedFrame
+                overlay.isCurrent = overlay.frame == selectedFrame
             }
-            for (time, renderer) in renderers {
-                let alpha = self.alpha(for: time)
+            for (frame, renderer) in renderers {
+                let alpha = self.alpha(for: frame)
                 if renderer.alpha != alpha {
                     renderer.alpha = alpha
                     renderer.setNeedsDisplay()
@@ -257,17 +311,69 @@ private struct WeatherMapRepresentable: UIViewRepresentable {
             }
         }
 
+        /// The location dot and the compass run only while the tab is on screen.
+        private func applyUser(_ parent: WeatherMapRepresentable, to map: MKMapView) {
+            if map.showsUserLocation != parent.isActive {
+                map.showsUserLocation = parent.isActive
+                if parent.isActive {
+                    if CLLocationManager.headingAvailable() { compass.startUpdatingHeading() }
+                } else {
+                    compass.stopUpdatingHeading()
+                }
+            }
+            if parent.recenterCount != handledRecenter {
+                handledRecenter = parent.recenterCount
+                center(on: map, animated: true)
+            }
+        }
+
+        /// Keeps the zoom the map has, moves it to the user.
+        private func center(on map: MKMapView, animated: Bool) {
+            guard let location = map.userLocation.location else { return }
+            map.setRegion(MKCoordinateRegion(center: location.coordinate, span: map.region.span), animated: animated)
+        }
+
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard userLocation.location != nil else { return }
+            if !didCenter {
+                didCenter = true
+                center(on: mapView, animated: false)
+            }
+            if let hasLocation, !hasLocation.wrappedValue {
+                // not while SwiftUI is updating the view
+                DispatchQueue.main.async { hasLocation.wrappedValue = true }
+            }
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard annotation is MKUserLocation else { return nil }
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: HeadingLocationView.reuseIdentifier) as? HeadingLocationView
+                ?? HeadingLocationView(annotation: annotation, reuseIdentifier: HeadingLocationView.reuseIdentifier)
+            view.heading = heading
+            userView = view
+            return view
+        }
+
+        func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+            // true north when the phone knows where it is, magnetic north otherwise; negative means no reading
+            let degrees = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+            heading = degrees >= 0 ? degrees : nil
+            userView?.heading = heading
+        }
+
+        func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool { false }
+
         /// The images that are not on screen stay a hair above 0: MapKit loads no tiles for a renderer that is invisible.
-        private func alpha(for time: Date) -> CGFloat {
-            showsRadar && time == selectedFrame ? 0.85 : 0.004
+        private func alpha(for frame: RadarFrame) -> CGFloat {
+            showsRadar && frame == selectedFrame ? 0.85 : 0.004
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             guard let tiles = overlay as? MKTileOverlay else { return MKOverlayRenderer(overlay: overlay) }
             let renderer = MKTileOverlayRenderer(tileOverlay: tiles)
             if let radar = tiles as? RadarTileOverlay {
-                renderer.alpha = alpha(for: radar.time)
-                renderers[radar.time] = renderer
+                renderer.alpha = alpha(for: radar.frame)
+                renderers[radar.frame] = renderer
             }
             return renderer
         }

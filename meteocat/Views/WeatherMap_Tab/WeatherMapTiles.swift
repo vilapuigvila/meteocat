@@ -2,110 +2,49 @@
 //  WeatherMapTiles.swift
 //  meteocat
 //
-//  Where the map tiles come from, and the MapKit overlays that load them.
-//  - Radar: Meteocat's own rain tiles (the ones meteo.cat/observacions/radar draws), one image every 6 minutes.
-//  - Satellite: Meteosat Third Generation through EUMETSAT's open WMS (EUMETView), no key.
+//  Where the radar tiles come from, and the MapKit overlays that load them: RainViewer's public weather maps API
+//  (https://www.rainviewer.com/api.html), one image every 10 minutes for the last two hours.
 //
 
 import MapKit
 
+/// One radar image: when it was taken and the path of its tiles.
+struct RadarFrame: Hashable {
+    let time: Date
+    let path: String
+}
+
+/// What RainViewer has: the host of the tiles and the images, oldest first.
+struct RadarMaps: Equatable {
+    let host: String
+    let frames: [RadarFrame]
+
+    init(host: String, frames: [RadarFrame]) {
+        self.host = host
+        self.frames = frames
+    }
+
+    init(_ dto: DTO.RainViewerMaps) {
+        host = dto.host
+        frames = dto.radar.past
+            .sorted { $0.time < $1.time }
+            .map { RadarFrame(time: Date(timeIntervalSince1970: $0.time), path: $0.path) }
+    }
+}
+
 enum WeatherMapTiles {
 
-    // MARK: Radar
-
-    /// A new radar image every 6 minutes. The newest one is about 15-20 minutes old when it appears.
-    static let radarStep: TimeInterval = 6 * 60
-    /// The last hour, both ends included.
-    static let radarFrameCount = 11
-    /// meteo.cat has no radar tiles beyond this zoom. MapKit stretches the last level.
+    /// RainViewer has no tiles beyond this zoom: it answers a "Zoom Level Not Supported" picture, with a success status.
+    /// MapKit does not stretch tiles by itself, so `RemoteTileOverlay` cuts closer zooms out of the zoom 7 tile.
     static let radarMaxZoom = 7
+    /// RainViewer's colour scheme ("Universal Blue"). The free tier answers the same colours for any scheme.
+    static let radarColorScheme = 2
 
-    /// The times of the frames to show, oldest first, ending at `latest` snapped down to a 6 minute step.
-    static func radarFrames(latest: Date, count: Int = radarFrameCount) -> [Date] {
-        let end = (latest.timeIntervalSince1970 / radarStep).rounded(.down) * radarStep
-        return (0..<max(count, 1)).map { Date(timeIntervalSince1970: end - Double(count - 1 - $0) * radarStep) }
+    /// `{host}{path}/256/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`: smoothed, without snow.
+    /// A tile without rain is a transparent picture. Rows count from the top, as in MapKit.
+    static func radarURL(host: String, frame: RadarFrame, z: Int, x: Int, y: Int) -> URL? {
+        URL(string: "\(host)\(frame.path)/256/\(z)/\(x)/\(y)/\(radarColorScheme)/1_0.png")
     }
-
-    /// The newest frame meteo.cat may already have published when it can't be asked: a bit under 20 minutes ago.
-    static func estimatedLatestRadar(now: Date = Date()) -> Date {
-        now.addingTimeInterval(-18 * 60)
-    }
-
-    /// `static-m.meteo.cat/tiles/radar/<UTC yyyy/MM/dd/HH/mm>/<zz>/000/000/<xxx>/000/000/<yyy>.png`.
-    /// The server counts rows from the bottom (TMS), MapKit from the top, so `y` is flipped.
-    /// A tile without rain does not exist (404), which MapKit leaves transparent.
-    static func radarURL(time: Date, z: Int, x: Int, y: Int) -> URL? {
-        let parts = utc.dateComponents([.year, .month, .day, .hour, .minute], from: time)
-        let flippedY = (1 << z) - 1 - y
-        let path = String(
-            format: "%04d/%02d/%02d/%02d/%02d/%02d/000/000/%03d/000/000/%03d",
-            parts.year ?? 0, parts.month ?? 0, parts.day ?? 0, parts.hour ?? 0, parts.minute ?? 0, z, x, flippedY
-        )
-        return URL(string: "https://static-m.meteo.cat/tiles/radar/\(path).png")
-    }
-
-    // MARK: Satellite
-
-    enum Satellite: String, CaseIterable, Identifiable {
-        /// True colour by day, infrared-based clouds at night.
-        case colour
-        case infrared
-
-        var id: String { rawValue }
-
-        var layer: String {
-            switch self {
-            case .colour: "mtg_fd:rgb_geocolour"
-            case .infrared: "mtg_fd:ir105_hrfi"
-            }
-        }
-
-        var style: String {
-            switch self {
-            case .colour: ""
-            case .infrared: "mtg_fd_ir105_hrfi_grayscale"
-            }
-        }
-    }
-
-    static let satelliteMaxZoom = 9
-    private static let webMercatorHalfWorld = 20_037_508.342789244
-
-    /// The newest image EUMETView may already have, when it can't be asked: 10 minute steps, about 40 minutes ago.
-    static func estimatedLatestSatellite(now: Date = Date()) -> Date {
-        let step: TimeInterval = 10 * 60
-        return Date(timeIntervalSince1970: ((now.timeIntervalSince1970 - 40 * 60) / step).rounded(.down) * step)
-    }
-
-    /// A WMS `GetMap` for one 256 px map tile, in web mercator, of the image taken at `time`.
-    /// Without a `TIME` EUMETView fills part of the map from another image, leaving a visible seam.
-    static func satelliteURL(_ satellite: Satellite, time: Date, z: Int, x: Int, y: Int) -> URL? {
-        let size = 2 * webMercatorHalfWorld / Double(1 << z)
-        let minX = -webMercatorHalfWorld + Double(x) * size
-        let maxY = webMercatorHalfWorld - Double(y) * size
-        var components = URLComponents(string: "https://view.eumetsat.int/geoserver/wms")
-        components?.queryItems = [
-            URLQueryItem(name: "service", value: "WMS"),
-            URLQueryItem(name: "version", value: "1.3.0"),
-            URLQueryItem(name: "request", value: "GetMap"),
-            URLQueryItem(name: "layers", value: satellite.layer),
-            URLQueryItem(name: "styles", value: satellite.style),
-            URLQueryItem(name: "crs", value: "EPSG:3857"),
-            URLQueryItem(name: "bbox", value: "\(minX),\(maxY - size),\(minX + size),\(maxY)"),
-            URLQueryItem(name: "width", value: "256"),
-            URLQueryItem(name: "height", value: "256"),
-            URLQueryItem(name: "format", value: "image/png"),
-            URLQueryItem(name: "transparent", value: "true"),
-            URLQueryItem(name: "time", value: ISO8601DateFormatter().string(from: time)),
-        ]
-        return components?.url
-    }
-
-    private static let utc: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        return calendar
-    }()
 }
 
 // MARK: - Loading -
@@ -225,48 +164,30 @@ class RemoteTileOverlay: MKTileOverlay {
 
 /// One radar image.
 final class RadarTileOverlay: RemoteTileOverlay {
-    let time: Date
+    let frame: RadarFrame
+    let host: String
     /// The image on screen. Its tiles load before those of the other images.
     var isCurrent = false
 
     private static let radarLoader = TileLoader(maxConnections: 6)
 
-    init(time: Date) {
-        self.time = time
+    init(frame: RadarFrame, host: String) {
+        self.frame = frame
+        self.host = host
         super.init(nativeMaxZoom: WeatherMapTiles.radarMaxZoom)
     }
 
     override var priority: Float { isCurrent ? 1 : 0.1 }
     override var loader: TileLoader { Self.radarLoader }
 
-    // MapKit compares overlays, and these differ only by time
-    override var hash: Int { time.hashValue }
+    // MapKit compares overlays, and these differ only by frame
+    override var hash: Int { frame.path.hashValue }
 
     override func isEqual(_ object: Any?) -> Bool {
-        (object as? RadarTileOverlay)?.time == time
+        (object as? RadarTileOverlay)?.frame.path == frame.path
     }
 
     override func nativeURL(z: Int, x: Int, y: Int) -> URL? {
-        WeatherMapTiles.radarURL(time: time, z: z, x: x, y: y)
-    }
-}
-
-/// The satellite image under the radar.
-final class SatelliteTileOverlay: RemoteTileOverlay {
-    let satellite: WeatherMapTiles.Satellite
-    let time: Date
-
-    private static let satelliteLoader = TileLoader(maxConnections: 6)
-
-    init(_ satellite: WeatherMapTiles.Satellite, time: Date) {
-        self.satellite = satellite
-        self.time = time
-        super.init(nativeMaxZoom: WeatherMapTiles.satelliteMaxZoom)
-    }
-
-    override var loader: TileLoader { Self.satelliteLoader }
-
-    override func nativeURL(z: Int, x: Int, y: Int) -> URL? {
-        WeatherMapTiles.satelliteURL(satellite, time: time, z: z, x: x, y: y)
+        WeatherMapTiles.radarURL(host: host, frame: frame, z: z, x: x, y: y)
     }
 }

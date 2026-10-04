@@ -1,6 +1,6 @@
 appId: com.pskmoons.meteocat
 ---
-# The Radar tab: map with the radar and satellite layers. Needs network. Build without Thread Sanitizer
+# The Radar tab: RainViewer radar over the map, with the time slider. Needs network. Build without Thread Sanitizer
 # (xcodebuild ... ENABLE_THREAD_SANITIZER=NO) if MapKit's renderer crashes under it in the simulator.
 - launchApp:
     clearState: true
@@ -13,9 +13,9 @@ appId: com.pskmoons.meteocat
     id: "map.view"
 - waitForAnimationToEnd:
     timeout: 10000
-- takeScreenshot: radar_satellite
+- takeScreenshot: radar
 - tapOn:
-    id: "map.infrared"
+    id: "map.radar"
 - waitForAnimationToEnd:
-    timeout: 10000
-- takeScreenshot: radar_infrared
+    timeout: 5000
+- takeScreenshot: radar_off

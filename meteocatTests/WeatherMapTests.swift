@@ -1,155 +1,148 @@
 import XCTest
+import MapKit
 @testable import meteocat
 
-/// The Radar tab: where its tiles come from, the times they are asked for, and the view model that picks the frames.
+/// The Radar tab: what RainViewer answers, where its tiles are, and the view model that picks the frames.
 @MainActor
 final class WeatherMapTests: XCTestCase {
 
-    private func utc(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, _ second: Int = 0) -> Date {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: second))!
+    // A trimmed answer of https://api.rainviewer.com/public/weather-maps.json (frames out of order on purpose).
+    private let json = """
+    {
+      "version": "2.0",
+      "generated": 1791147023,
+      "host": "https://tilecache.rainviewer.com",
+      "radar": {
+        "past": [
+          {"time": 1791140400, "path": "/v2/radar/71a424d19da0"},
+          {"time": 1791139800, "path": "/v2/radar/f73f910b7e10"},
+          {"time": 1791147000, "path": "/v2/radar/e8a6e4be457c"}
+        ],
+        "nowcast": []
+      },
+      "satellite": {"infrared": []}
+    }
+    """
+
+    private func maps() throws -> RadarMaps {
+        RadarMaps(try JSONDecoder().decode(DTO.RainViewerMaps.self, from: Data(json.utf8)))
     }
 
-    // MARK: - Radar frames -
-
-    func testFramesCoverTheLastHourEveryAndEndAtTheNewestImage() {
-        let frames = WeatherMapTiles.radarFrames(latest: utc(2026, 10, 4, 18, 12))
-
-        XCTAssertEqual(frames.count, 11)
-        XCTAssertEqual(frames.first, utc(2026, 10, 4, 17, 12))
-        XCTAssertEqual(frames.last, utc(2026, 10, 4, 18, 12))
-        XCTAssertEqual(Set(zip(frames, frames.dropFirst()).map { $1.timeIntervalSince($0) }), [360])
+    private func frame(_ minutes: Int) -> RadarFrame {
+        RadarFrame(time: Date(timeIntervalSince1970: 1_791_139_800 + Double(minutes) * 60), path: "/v2/radar/frame\(minutes)")
     }
 
-    func testFramesSnapToTheSixMinuteStep() {
-        let frames = WeatherMapTiles.radarFrames(latest: utc(2026, 10, 4, 18, 14, 40))
-        XCTAssertEqual(frames.last, utc(2026, 10, 4, 18, 12))
+    // MARK: - The answer -
+
+    func testTheAnswerIsReadIgnoringWhatTheAppDoesNotUse() throws {
+        let maps = try maps()
+
+        XCTAssertEqual(maps.host, "https://tilecache.rainviewer.com")
+        XCTAssertEqual(maps.frames.count, 3)
     }
 
-    func testFramesCrossMidnightInUTC() {
-        let frames = WeatherMapTiles.radarFrames(latest: utc(2026, 10, 5, 0, 12))
-        XCTAssertEqual(frames.first, utc(2026, 10, 4, 23, 12))
+    func testFramesAreOldestFirstWithTheirTimes() throws {
+        let frames = try maps().frames
+
+        XCTAssertEqual(frames.map(\.path), ["/v2/radar/f73f910b7e10", "/v2/radar/71a424d19da0", "/v2/radar/e8a6e4be457c"])
+        XCTAssertEqual(frames.first?.time, Date(timeIntervalSince1970: 1_791_139_800))
+        XCTAssertEqual(frames.last?.time, Date(timeIntervalSince1970: 1_791_147_000))
     }
 
-    // MARK: - Radar tile URL -
-
-    /// meteo.cat counts tile rows from the bottom, MapKit from the top: row 47 of 128 is row 80 for the server.
-    func testRadarTileURLFlipsTheRowAndPadsTheNumbers() {
-        let url = WeatherMapTiles.radarURL(time: utc(2026, 10, 4, 18, 6), z: 7, x: 64, y: 47)
-        XCTAssertEqual(url?.absoluteString, "https://static-m.meteo.cat/tiles/radar/2026/10/04/18/06/07/000/000/064/000/000/080.png")
+    func testAnAnswerWithoutRadarCannotBeRead() {
+        XCTAssertThrowsError(try JSONDecoder().decode(DTO.RainViewerMaps.self, from: Data(#"{"host": "https://x"}"#.utf8)))
     }
 
-    func testRadarTileURLUsesUTCForTheTimeOfTheImage() {
-        let url = WeatherMapTiles.radarURL(time: utc(2026, 1, 2, 3, 0), z: 5, x: 1, y: 0)
-        XCTAssertEqual(url?.absoluteString, "https://static-m.meteo.cat/tiles/radar/2026/01/02/03/00/05/000/000/001/000/000/031.png")
+    // MARK: - Tile URL -
+
+    func testTileURLIsHostPathSizeZoomColumnRow() {
+        let url = WeatherMapTiles.radarURL(host: "https://tilecache.rainviewer.com", frame: frame(0), z: 7, x: 64, y: 47)
+        XCTAssertEqual(url?.absoluteString, "https://tilecache.rainviewer.com/v2/radar/frame0/256/7/64/47/2/1_0.png")
     }
 
-    // MARK: - Satellite tile URL -
-
-    func testSatelliteTileURLAsksForTheWholeWorldAtZoomZero() throws {
-        let url = try XCTUnwrap(WeatherMapTiles.satelliteURL(.colour, time: utc(2026, 10, 4, 18), z: 0, x: 0, y: 0))
-        let items = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
-
-        XCTAssertEqual(url.host, "view.eumetsat.int")
-        XCTAssertEqual(items["layers"], "mtg_fd:rgb_geocolour")
-        XCTAssertEqual(items["crs"], "EPSG:3857")
-        XCTAssertEqual(items["time"], "2026-10-04T18:00:00Z")
-        XCTAssertEqual(items["width"], "256")
-        let box = (items["bbox"] ?? "").split(separator: ",").compactMap { Double($0) }
-        XCTAssertEqual(box.count, 4)
-        XCTAssertEqual(box[0], -20_037_508.34, accuracy: 0.01)
-        XCTAssertEqual(box[1], -20_037_508.34, accuracy: 0.01)
-        XCTAssertEqual(box[2], 20_037_508.34, accuracy: 0.01)
-        XCTAssertEqual(box[3], 20_037_508.34, accuracy: 0.01)
+    /// Unlike meteo.cat's, rows count from the top, as in MapKit: nothing is flipped.
+    func testTileURLKeepsMapKitsRow() {
+        let url = WeatherMapTiles.radarURL(host: "https://h", frame: frame(0), z: 3, x: 4, y: 1)
+        XCTAssertEqual(url?.lastPathComponent, "1_0.png")
+        XCTAssertTrue(url?.absoluteString.contains("/256/3/4/1/") == true)
     }
 
-    /// The second tile of the top row at zoom 1 is the north-east quarter.
-    func testSatelliteTileURLBoxFollowsTheTileOrigin() throws {
-        let url = try XCTUnwrap(WeatherMapTiles.satelliteURL(.infrared, time: utc(2026, 10, 4, 18), z: 1, x: 1, y: 0))
-        let items = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
-        let box = (items["bbox"] ?? "").split(separator: ",").compactMap { Double($0) }
+    // MARK: - Overlay -
 
-        XCTAssertEqual(items["layers"], "mtg_fd:ir105_hrfi")
-        XCTAssertEqual(items["styles"], "mtg_fd_ir105_hrfi_grayscale")
-        XCTAssertEqual(box, [0, 0, 20_037_508.342789244, 20_037_508.342789244])
+    func testOverlaysOfDifferentFramesAreDifferentToMapKit() {
+        let one = RadarTileOverlay(frame: frame(0), host: "https://h")
+        let same = RadarTileOverlay(frame: frame(0), host: "https://h")
+        let other = RadarTileOverlay(frame: frame(10), host: "https://h")
+
+        XCTAssertTrue(one.isEqual(same))
+        XCTAssertEqual(one.hash, same.hash)
+        XCTAssertFalse(one.isEqual(other))
     }
 
-    func testEstimatedSatelliteTimeIsFortyMinutesBackOnATenMinuteStep() {
-        XCTAssertEqual(WeatherMapTiles.estimatedLatestSatellite(now: utc(2026, 10, 4, 18, 37)), utc(2026, 10, 4, 17, 50))
-    }
+    /// Past zoom 7 RainViewer answers a "Zoom Level Not Supported" picture, so those tiles are asked at zoom 7 instead.
+    func testCloserZoomsAskForTheZoomSevenTileThatContainsThem() {
+        let overlay = RadarTileOverlay(frame: frame(0), host: "https://h")
 
-    // MARK: - Reading the times -
-
-    func testRadarTimeIsReadFromThePageScript() {
-        let html = """
-        <script>
-            Meteocat.tempsActual.init({
-                id: 'map',
-                dataServidor: '10/04/2026 18:19Z',
-                dataDarreraRadar: '10/04/2026 18:06Z',
-                dataDarreraAdveccio: '2026-10-04T18:06:00+00:00'
-            });
-        </script>
-        """
-        XCTAssertEqual(ServerData.parseRadarTime(html: html), utc(2026, 10, 4, 18, 6))
-    }
-
-    func testRadarTimeIsNilWhenThePageChanges() {
-        XCTAssertNil(ServerData.parseRadarTime(html: "<html><body>no script</body></html>"))
-        XCTAssertNil(ServerData.parseRadarTime(html: "dataDarreraRadar: ''"))
-    }
-
-    func testSatelliteTimeIsTheEndOfTheGeoColourDimension() {
-        let xml = """
-        <Layer queryable="1"><Name>rgb_cloudphase</Name>
-          <Dimension name="time" units="ISO8601" default="2026-10-04T17:50:00Z">2024-09-23T00:00:00.000Z/2026-10-04T17:50:00.000Z/PT10M</Dimension></Layer>
-        <Layer queryable="1"><Name>rgb_geocolour</Name><Title>GeoColour</Title>
-          <Dimension name="time" units="ISO8601" default="2026-10-04T18:20:00Z" nearestValue="1">2024-09-23T00:00:00.000Z/2026-10-04T18:20:00.000Z/PT10M</Dimension></Layer>
-        """
-        XCTAssertEqual(ServerData.parseSatelliteTime(capabilities: xml), utc(2026, 10, 4, 18, 20))
-    }
-
-    func testSatelliteTimeIsNilWithoutTheLayer() {
-        XCTAssertNil(ServerData.parseSatelliteTime(capabilities: "<Layer><Name>rgb_dust</Name></Layer>"))
+        // zoom 9 tile (258, 190) lives in the zoom 7 tile (64, 47)
+        let url = overlay.url(forTilePath: MKTileOverlayPath(x: 258, y: 190, z: 9, contentScaleFactor: 1))
+        XCTAssertTrue(url.absoluteString.contains("/256/7/64/47/"), url.absoluteString)
+        XCTAssertEqual(overlay.maximumZ, 7 + 4)
     }
 
     // MARK: - View model -
 
     private struct Offline: Error {}
 
-    private func makeViewModel(radar: Date? = nil, satellite: Date? = nil, now: Date) -> WeatherMapViewModel {
-        WeatherMapViewModel(
-            latestRadar: { if let radar { return radar } else { throw Offline() } },
-            latestSatellite: { if let satellite { return satellite } else { throw Offline() } },
-            now: { now }
-        )
+    private func makeViewModel(_ answer: Result<RadarMaps, Error>, now: @escaping () -> Date = { Date() }) -> WeatherMapViewModel {
+        WeatherMapViewModel(loadMaps: { try answer.get() }, now: now)
     }
 
-    func testLoadShowsTheNewestRadarImageAndTheSatelliteTime() async {
-        let viewModel = makeViewModel(radar: utc(2026, 10, 4, 18, 12), satellite: utc(2026, 10, 4, 18, 0), now: utc(2026, 10, 4, 18, 30))
+    func testLoadShowsTheNewestImage() async throws {
+        let viewModel = makeViewModel(.success(try maps()))
 
         await viewModel.load()
 
-        XCTAssertEqual(viewModel.frames.count, 11)
-        XCTAssertEqual(viewModel.currentFrame, utc(2026, 10, 4, 18, 12))
-        XCTAssertEqual(viewModel.satelliteTime, utc(2026, 10, 4, 18, 0))
+        XCTAssertEqual(viewModel.host, "https://tilecache.rainviewer.com")
+        XCTAssertEqual(viewModel.frames.count, 3)
+        XCTAssertEqual(viewModel.currentFrame, viewModel.frames.last)
+        XCTAssertFalse(viewModel.failed)
     }
 
-    func testLoadEstimatesTheTimesWhenTheServersDoNotAnswer() async {
-        let now = utc(2026, 10, 4, 18, 37)
-        let viewModel = makeViewModel(now: now)
+    func testLoadFailureWithNothingToShowIsReported() async {
+        let viewModel = makeViewModel(.failure(Offline()))
 
         await viewModel.load()
 
-        XCTAssertEqual(viewModel.currentFrame, WeatherMapTiles.radarFrames(latest: WeatherMapTiles.estimatedLatestRadar(now: now)).last)
-        XCTAssertEqual(viewModel.satelliteTime, WeatherMapTiles.estimatedLatestSatellite(now: now))
+        XCTAssertTrue(viewModel.failed)
+        XCTAssertTrue(viewModel.frames.isEmpty)
     }
 
-    func testPlayStartsOverFromTheOldestImageWhenOnTheNewest() async {
-        let viewModel = makeViewModel(radar: utc(2026, 10, 4, 18, 12), satellite: utc(2026, 10, 4, 18, 0), now: utc(2026, 10, 4, 18, 30))
+    func testAnAnswerWithoutFramesIsAFailure() async {
+        let viewModel = makeViewModel(.success(RadarMaps(host: "https://h", frames: [])))
+
         await viewModel.load()
-        XCTAssertEqual(viewModel.frameIndex, 10)
+
+        XCTAssertTrue(viewModel.failed)
+    }
+
+    func testLoadFailureKeepsTheImagesAlreadyShown() async throws {
+        var answer: Result<RadarMaps, Error> = .success(try maps())
+        var clock = Date()
+        let viewModel = WeatherMapViewModel(loadMaps: { try answer.get() }, now: { clock })
+        await viewModel.load()
+
+        answer = .failure(Offline())
+        clock = clock.addingTimeInterval(600)
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.frames.count, 3)
+        XCTAssertFalse(viewModel.failed)
+    }
+
+    func testPlayStartsOverFromTheOldestImageWhenOnTheNewest() async throws {
+        let viewModel = makeViewModel(.success(try maps()))
+        await viewModel.load()
+        XCTAssertEqual(viewModel.frameIndex, 2)
 
         viewModel.togglePlay()
         XCTAssertTrue(viewModel.isPlaying)
@@ -160,27 +153,68 @@ final class WeatherMapTests: XCTestCase {
     }
 
     func testPlayAdvancesThroughTheFrames() async throws {
-        let viewModel = makeViewModel(radar: utc(2026, 10, 4, 18, 12), satellite: utc(2026, 10, 4, 18, 0), now: utc(2026, 10, 4, 18, 30))
+        let viewModel = makeViewModel(.success(try maps()))
         await viewModel.load()
 
         viewModel.togglePlay()
-        try await Task.sleep(nanoseconds: 1_300_000_000)
+        try await Task.sleep(nanoseconds: 800_000_000)
         viewModel.pause()
 
         XCTAssertGreaterThan(viewModel.frameIndex, 0)
     }
 
-    func testLoadAgainSoonDoesNotAskTheServersAgain() async {
+    func testLoadAgainSoonDoesNotAskAgain() async throws {
         var asked = 0
-        let viewModel = WeatherMapViewModel(
-            latestRadar: { asked += 1; return Date() },
-            latestSatellite: { Date() },
-            now: { Date() }
-        )
+        let answer = try maps()
+        let viewModel = WeatherMapViewModel(loadMaps: { asked += 1; return answer }, now: { Date() })
 
         await viewModel.load()
         await viewModel.load()
 
         XCTAssertEqual(asked, 1)
+    }
+
+    func testANewImageMovesTheViewToItWhenTheOldestWasOnTheNewest() async throws {
+        var answer = try maps()
+        var clock = Date()
+        let viewModel = WeatherMapViewModel(loadMaps: { answer }, now: { clock })
+        await viewModel.load()
+
+        let newer = RadarFrame(time: Date(timeIntervalSince1970: 1_791_147_600), path: "/v2/radar/newer")
+        answer = RadarMaps(host: answer.host, frames: Array(answer.frames.dropFirst()) + [newer])
+        clock = clock.addingTimeInterval(600)
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.currentFrame, newer)
+    }
+}
+
+/// The compass point shown beside the user on the radar map.
+final class CompassTests: XCTestCase {
+
+    func testTheEightPoints() {
+        let expected = [0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW", 270: "W", 315: "NW"]
+        for (degrees, name) in expected {
+            XCTAssertEqual(Compass.point(for: Double(degrees)), name, "\(degrees)°")
+        }
+    }
+
+    func testEachPointCoversTwentyTwoAndAHalfDegreesEitherSide() {
+        XCTAssertEqual(Compass.point(for: 22.4), "N")
+        XCTAssertEqual(Compass.point(for: 22.6), "NE")
+        XCTAssertEqual(Compass.point(for: 337.4), "NW")
+        XCTAssertEqual(Compass.point(for: 337.6), "N")
+    }
+
+    func testNegativeAndLargeAnglesGoRoundTheCircle() {
+        XCTAssertEqual(Compass.point(for: -90), "W")
+        XCTAssertEqual(Compass.point(for: 450), "E")
+        XCTAssertEqual(Compass.point(for: 360), "N")
+    }
+
+    func testTextShowsThePointAndTheRoundedDegrees() {
+        XCTAssertEqual(Compass.text(for: 314.6), "NW 315°")
+        XCTAssertEqual(Compass.text(for: 359.7), "N 0°")
+        XCTAssertEqual(Compass.text(for: -90), "W 270°")
     }
 }

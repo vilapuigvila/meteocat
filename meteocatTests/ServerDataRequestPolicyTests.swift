@@ -111,20 +111,11 @@ final class ServerDataRequestPolicyTests: XCTestCase {
         XCTAssertTrue(request.headers.isEmpty)
     }
 
-    // MARK: - Map images -
+    // MARK: - Radar images -
 
-    func testRadarTimeIsAskedOfTheRadarPageAndCachedThreeMinutes() {
-        let request = ServerData.makeRequest(for: .radarLatest)
-        XCTAssertEqual(request.urlString, "https://www.meteo.cat/observacions/radar")
-        XCTAssertEqual(request.ttl, 180)
-        XCTAssertEqual(request.cacheControlBehavior, .ignoreServer)
-        XCTAssertEqual(request.allowStaleOnError, true)
-        XCTAssertTrue(request.headers.isEmpty)
-    }
-
-    func testSatelliteTimeIsAskedOfTheSmallCapabilitiesDocument() {
-        let request = ServerData.makeRequest(for: .satelliteLatest)
-        XCTAssertEqual(request.urlString, "https://view.eumetsat.int/geoserver/mtg_fd/wms?service=WMS&version=1.3.0&request=GetCapabilities")
+    func testRadarMapsAreAskedOfRainViewerAndCachedThreeMinutes() {
+        let request = ServerData.makeRequest(for: .radarMaps)
+        XCTAssertEqual(request.urlString, "https://api.rainviewer.com/public/weather-maps.json")
         XCTAssertEqual(request.ttl, 180)
         XCTAssertEqual(request.cacheControlBehavior, .ignoreServer)
         XCTAssertEqual(request.allowStaleOnError, true)
