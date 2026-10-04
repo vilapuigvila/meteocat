@@ -1,0 +1,39 @@
+# The loader goes away once a tab has its content. A loader left on screen would block the tab for good.
+# It only shows for a moment (the data is fast), so this checks the end state of three tabs, not the loader itself.
+# Needs network. Run against the booted Claude-Test simulator:
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/loader.yaml
+appId: com.pskmoons.meteocat
+---
+- launchApp:
+    clearState: true
+
+# Stations: the list replaces the loader
+- tapOn: "Stations"
+- extendedWaitUntil:
+    visible:
+      id: "stations.search"
+    timeout: 90000
+- extendedWaitUntil:
+    notVisible:
+      id: "signal.loader"
+    timeout: 30000
+
+# Favs: the empty state replaces the loader
+- tapOn: "Favs"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    notVisible:
+      id: "signal.loader"
+    timeout: 30000
+
+# Radar: the map controls replace the loader
+- tapOn: "Radar"
+- extendedWaitUntil:
+    visible:
+      id: "map.play"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "signal.loader"
+    timeout: 30000
+- takeScreenshot: loader_gone

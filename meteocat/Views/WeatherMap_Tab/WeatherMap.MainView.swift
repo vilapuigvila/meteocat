@@ -24,6 +24,16 @@ struct WeatherMapView: View {
                     showsRadar: viewModel.showsRadar
                 )
                 .ignoresSafeArea(edges: .bottom)
+                if viewModel.frames.isEmpty {
+                    SignalLoader(.compact, caption: "Loading radar")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Signal.paper)
+                        .overlay(Rectangle().stroke(Signal.ink, lineWidth: 1))
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 16)
+                        .transition(.opacity)
+                }
                 buildControls()
             }
         }

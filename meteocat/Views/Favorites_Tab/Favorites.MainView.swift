@@ -48,7 +48,7 @@ extension Favorites {
                     }
                 }
                 if case .loading = state {
-                    WeatherLoader()
+                    SignalLoader("Loading favorites")
                 }
                 if case .loaded(let representable) = state {
                     NavigationStack {

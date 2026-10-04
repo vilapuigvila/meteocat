@@ -28,7 +28,6 @@ extension StationsList {
         
         @State private var selectedStation: DTO.Station?
         @State private var isPresentedDetail = false
-        @State private var isPullToRefresh = false
         @State private var searchText = ""
 //        @State private var path: [] = []
 
@@ -39,9 +38,8 @@ extension StationsList {
                     buildHeader()
 
                     if viewModel.state == .loading {
-                        Text("loading")
-                            .opacity(isPullToRefresh ? 1 : 0)
-                            .padding(.top, 24)
+                        Spacer(minLength: 0)
+                        SignalLoader("Loading stations")
                         Spacer(minLength: 0)
                     } else {
                         Group {
@@ -84,9 +82,6 @@ extension StationsList {
             .onDisappear {
 //                selectedStation = nil
                 viewModel.action(.onDisappear)
-            }
-            .onChange(of: viewModel.state) {
-                isPullToRefresh = viewModel.state == .loading
             }
         }
 

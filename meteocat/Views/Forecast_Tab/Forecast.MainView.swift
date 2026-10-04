@@ -35,7 +35,7 @@ extension Forecast {
                 Color.black.ignoresSafeArea()
                 
                 if case .loading = stateView {
-                    WeatherLoader()
+                    SignalLoader("Loading forecast")
                 }
                 
                 if case .loaded(let representable) = stateView {

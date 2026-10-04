@@ -82,7 +82,7 @@ extension HomeStation {
                     .transition(.opacity)
                 }
                 if case .loading = state {
-                    WeatherLoader()
+                    SignalLoader("Loading station")
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
                 if case .loaded(let representable) = state {
