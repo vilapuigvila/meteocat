@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		264AFF21651A95F78F8626C3 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 909F688024A41A4B2E77EE0A /* Foundation.framework */; };
 		5021854B2E857D4800E6F003 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5021854A2E857D4800E6F003 /* GoogleService-Info.plist */; };
 		5021854F2E85859000E6F003 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 5021854E2E85859000E6F003 /* FirebaseAnalytics */; };
 		502185512E85859000E6F003 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 502185502E85859000E6F003 /* FirebaseCrashlytics */; };
@@ -17,12 +18,24 @@
 		50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2B93BBE34BB467E734668EED /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 50EF9FB02CD3846B0066CAAE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50EF9FB72CD3846B0066CAAE;
+			remoteInfo = meteocat;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		5021854A2E857D4800E6F003 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		50EF9FB82CD3846B0066CAAE /* meteocat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = meteocat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		50EF9FBB2CD3846B0066CAAE /* meteocatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = meteocatApp.swift; sourceTree = "<group>"; };
 		50EF9FC12CD3846D0066CAAE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		76787E9DF1988296440E396D /* meteocatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = meteocatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		909F688024A41A4B2E77EE0A /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,9 +46,18 @@
 		50EA91502D54FC4900E22B0A /* Helpers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Helpers; sourceTree = "<group>"; };
 		50EA91562D550E7C00E22B0A /* UserPreferences */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = UserPreferences; sourceTree = "<group>"; };
 		50F89E3C2D52036F00F7884F /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
+		A0C20FFBB34A92D315F8EE52 /* meteocatTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = meteocatTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3F63DE2DBA95FAFA8DAFFEA1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				264AFF21651A95F78F8626C3 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		50EF9FB52CD3846B0066CAAE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -55,6 +77,8 @@
 			children = (
 				50EF9FBA2CD3846B0066CAAE /* meteocat */,
 				50EF9FB92CD3846B0066CAAE /* Products */,
+				AE344D7DA562E4BC67DBDAE3 /* Frameworks */,
+				A0C20FFBB34A92D315F8EE52 /* meteocatTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -62,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				50EF9FB82CD3846B0066CAAE /* meteocat.app */,
+				76787E9DF1988296440E396D /* meteocatTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,9 +117,46 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		AE344D7DA562E4BC67DBDAE3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E347B5E013FD2568FFB7CC98 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E347B5E013FD2568FFB7CC98 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				909F688024A41A4B2E77EE0A /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3C1F34ABB8F87B916F778B66 /* meteocatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D267B0A4C703B581C94BCF6 /* Build configuration list for PBXNativeTarget "meteocatTests" */;
+			buildPhases = (
+				982113D3F0E76A335730DFCA /* Sources */,
+				3F63DE2DBA95FAFA8DAFFEA1 /* Frameworks */,
+				4BDE981F37A62BE4F345FB06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F8F7383CC830AB9AC5302954 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A0C20FFBB34A92D315F8EE52 /* meteocatTests */,
+			);
+			name = meteocatTests;
+			productName = meteocatTests;
+			productReference = 76787E9DF1988296440E396D /* meteocatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		50EF9FB72CD3846B0066CAAE /* meteocat */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 50EF9FC82CD3846D0066CAAE /* Build configuration list for PBXNativeTarget "meteocat" */;
@@ -161,11 +223,19 @@
 			projectRoot = "";
 			targets = (
 				50EF9FB72CD3846B0066CAAE /* meteocat */,
+				3C1F34ABB8F87B916F778B66 /* meteocatTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		4BDE981F37A62BE4F345FB06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		50EF9FB62CD3846B0066CAAE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -215,9 +285,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		982113D3F0E76A335730DFCA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		F8F7383CC830AB9AC5302954 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = meteocat;
+			target = 50EF9FB72CD3846B0066CAAE /* meteocat */;
+			targetProxy = 2B93BBE34BB467E734668EED /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		33B4354AD1341B1B160792E2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = HL99S7U2Q3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pskmoons.meteocatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/meteocat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/meteocat";
+			};
+			name = Debug;
+		};
 		50EF9FC62CD3846D0066CAAE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -404,6 +508,25 @@
 			};
 			name = Release;
 		};
+		C2FA8D54AF71B4B446E3260B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = HL99S7U2Q3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pskmoons.meteocatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/meteocat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/meteocat";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -421,6 +544,15 @@
 			buildConfigurations = (
 				50EF9FC92CD3846D0066CAAE /* Debug */,
 				50EF9FCA2CD3846D0066CAAE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8D267B0A4C703B581C94BCF6 /* Build configuration list for PBXNativeTarget "meteocatTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2FA8D54AF71B4B446E3260B /* Release */,
+				33B4354AD1341B1B160792E2 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

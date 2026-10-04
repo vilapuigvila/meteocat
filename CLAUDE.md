@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-iOS SwiftUI app (bundle `com.pskmoons.meteocat`, Swift 5, iOS 18 target) showing observed weather data from Meteocat's XEMA station network (Catalonia). Single Xcode project, no test target.
+iOS SwiftUI app (bundle `com.pskmoons.meteocat`, Swift 5, iOS 18 target) showing observed weather data from Meteocat's XEMA station network (Catalonia). Single Xcode project with one unit test target (`meteocatTests`).
 
 ## Commands
 
@@ -15,7 +15,14 @@ open meteocat.xcodeproj
 xcodebuild -project meteocat.xcodeproj -scheme meteocat -destination 'platform=iOS Simulator,name=iPhone 15' build
 ```
 
-There is no XCTest target, so there is no test or lint command. If adding one, use XCTest (`SomethingTests.swift` under a `*Tests/` target) and start with `Network/` parsing and view-model state mapping. Adjust the simulator name to one installed locally (`xcrun simctl list devices`).
+Unit tests (XCTest, run in the app host; no lint command exists). Use the dedicated `Claude-Test` simulator rather than whichever one is booted, since running tests reinstalls the app and wipes its state:
+
+```
+xcodebuild test -project meteocat.xcodeproj -scheme meteocat -destination 'platform=iOS Simulator,name=Claude-Test'
+# one class: add  -only-testing:meteocatTests/StationMonthTests
+```
+
+Tests cover the day/cache rules, the month maths, the HTML parsing and the SwiftData cache (against an in-memory database). Adjust simulator names to what `xcrun simctl list devices` shows locally.
 
 `GoogleService-Info.plist` is checked in and `FirebaseApp.configure()` runs at launch (`meteocatApp.swift`), so Crashlytics is always active.
 
@@ -34,7 +41,8 @@ Each tab under `meteocat/Views/<Feature>_Tab/` follows the same Clean-Swift-styl
 
 **Data flow and caching**:
 - `Network/Requester.swift` (`ServerData.request(.service)`) is the only network entry point. Despite the official REST API existing, most data is **scraped from HTML** with SwiftSoup (`meteo.cat/observacions/xema` for the station list, which is parsed out of an inline `var meta = {...}` script; `/observacions/xema/dades?codi=…&dia=…` for daily tables; `m.meteo.cat` for current weather). Only `lastTemperature` uses the JSON API (`api.meteo.cat`, `x-api-key` header). Scraping is fragile: a markup change on meteo.cat breaks parsing, and the table row labels are Catalan strings matched after diacritic folding (e.g. `"temperatura maxima"`, `"precipitacio acumulada"` in `FavoritesInteractor.mapStationInfo`).
-- `StationWorker` (in `Views/HomeStation_Tab/`, but used by Favorites and the prefetch too) is the cache layer: it reads `Model.InfoStationByDate` from SwiftData first (a row is valid only if created within the last hour and on the same day), otherwise hits the network and stores the result, pruning older rows for that station and day. `fetchMonthInfoStation` fills day 1…today for one station.
+- `StationWorker` (in `Views/HomeStation_Tab/`, but used by Favorites and the prefetch too) is the cache layer: one `Model.InfoStationByDate` row per station and day (`dayKey` = yyyymmdd), stamped with the real download time (`createdAt`). `DayKey` (`StationMonth.swift`) holds the rules: meteo.cat summarises **UTC days**, so a day is final only if it was downloaded an hour after it ended; any other day is refreshed once it is an hour old. A day whose UTC start is in the future (first local hours after midnight) has no server page and surfaces as `StationWorker.ErrorReason.noData`. Concurrent requests for the same day share one download; the month fetch runs at most 4 requests at once, newest day first.
+- Month tiles (`[StationDayInfo].summary()`): the average is the mean of daily means of **complete days only**; rain is the month-to-date sum including today. Don't build dates with `DateFormatter`/`Calendar.current` for requests: use `DayKey` (Gregorian, explicit time zone).
 - SwiftData access goes through `@MainActor` helpers, so workers hop to the main actor for DB reads/writes while network calls run off it.
 - `DTO.*` are network payloads, `Model.*` are persisted SwiftData models, `Favorites.Representable`-style structs are UI values. Favorite status lives on `Model.Station.isFavorite`.
 - `UserPreferences/UserPreferences.swift`: `@UserDefault` property wrapper (JSON-encoded in `UserDefaults`) exposed through `UserSettings` statics, e.g. the home station and last-request timestamps.
