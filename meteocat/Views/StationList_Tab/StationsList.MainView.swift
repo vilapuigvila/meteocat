@@ -35,40 +35,47 @@ extension StationsList {
 // "avp check it out ⚠️ -> .navigationTitle(Estacions) comes from top after pull to refresh"
         var body: some View {
             NavigationStack {
-                if viewModel.state == .loading {
-                    Text("loading")
-                        .opacity(isPullToRefresh ? 1 : 0)
-//                        .animation(.easeInOut(duration: 0.4), value: isPullToRefresh)
-                } else {
-                    Group {
-                        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, filteredStations.isEmpty {
-                            ContentUnavailableView.search(text: searchText)
-                        } else {
-                            ListView(
-                                stations: filteredStations,
-                                selectedStation: $selectedStation,
-                                isPresentedDetail: $isPresentedDetail
-                            )
-                            .refreshable {
-                                viewModel.action(.pullToRefresh)
+                VStack(spacing: 0) {
+                    buildHeader()
+
+                    if viewModel.state == .loading {
+                        Text("loading")
+                            .opacity(isPullToRefresh ? 1 : 0)
+                            .padding(.top, 24)
+                        Spacer(minLength: 0)
+                    } else {
+                        Group {
+                            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, filteredStations.isEmpty {
+                                ContentUnavailableView.search(text: searchText)
+                            } else {
+                                ListView(
+                                    stations: filteredStations,
+                                    nearest: isSearching ? nil : viewModel.nearest,
+                                    selectedStation: $selectedStation,
+                                    isPresentedDetail: $isPresentedDetail
+                                )
+                                .refreshable {
+                                    viewModel.action(.pullToRefresh)
+                                }
                             }
                         }
                     }
-                    .navigationTitle("Estacions")
-                    .navigationDestination(isPresented: $isPresentedDetail) {
-                        if let selectedStation {
-                            buildDetailView(
-                                stationCode: selectedStation.code,
-                                cityCode: selectedStation.city.codi,
-                                stationName: selectedStation.name
-                            )
-                        } else {
-                            Text("Something went wrong")
-                        }
+                }
+                .background(Signal.paper.ignoresSafeArea())
+                .navigationTitle("Estacions")
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: $isPresentedDetail) {
+                    if let selectedStation {
+                        buildDetailView(
+                            stationCode: selectedStation.code,
+                            cityCode: selectedStation.city.codi,
+                            stationName: selectedStation.name
+                        )
+                    } else {
+                        Text("Something went wrong")
                     }
                 }
             }
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search stations")
             .refreshable {
                 viewModel.action(.pullToRefresh)
             }.onAppear {
@@ -81,6 +88,55 @@ extension StationsList {
             .onChange(of: viewModel.state) {
                 isPullToRefresh = viewModel.state == .loading
             }
+        }
+
+        private var isSearching: Bool {
+            !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+
+        // MARK: Header
+
+        private func buildHeader() -> some View {
+            let total = viewModel.state.result.stations.count
+            let shown = filteredStations.count
+            return SignalHeader {
+                SignalKicker(shown == total ? "\(total) stations" : "\(shown) of \(total)")
+                    .frame(minHeight: 44, alignment: .leading)
+                Text("Estacions")
+                    .font(.system(size: 48, weight: .light))
+                    .tracking(-1.4)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.top, 4)
+                buildSearchField()
+                    .padding(.top, 16)
+            }
+        }
+
+        private func buildSearchField() -> some View {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Signal.muted)
+                TextField("Search stations", text: $searchText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .accessibilityLabel("Search stations")
+                    .accessibilityIdentifier("stations.search")
+                if isSearching {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .foregroundStyle(Signal.ink)
+            .padding(.leading, 14)
+            .frame(height: 48)
+            .background(Signal.paper)
         }
 
         private var filteredStations: [DTO.Station] {
@@ -109,14 +165,20 @@ extension StationsList {
     fileprivate struct ListView: View {
 #warning("avp check it out ⚠️ -> move to representable")
         let stations: [DTO.Station]
+        /// The operating station closest to the user, when the location is available.
+        let nearest: NearestStation.Suggestion?
         
         @Binding var selectedStation: DTO.Station?
         @Binding var isPresentedDetail: Bool
         
-        private let columns = [GridItem(.flexible())]
-        
-        init(stations: [DTO.Station], selectedStation: Binding<DTO.Station?>, isPresentedDetail: Binding<Bool>) {
+        init(
+            stations: [DTO.Station],
+            nearest: NearestStation.Suggestion? = nil,
+            selectedStation: Binding<DTO.Station?>,
+            isPresentedDetail: Binding<Bool>
+        ) {
             self.stations = stations
+            self.nearest = nearest
             _selectedStation = selectedStation
             _isPresentedDetail = isPresentedDetail
         }
@@ -127,32 +189,91 @@ extension StationsList {
         
         private func buildNavigationStackView() -> some View {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
+                LazyVStack(spacing: 0) {
+                    if let nearest, let station = stations.first(where: { $0.code == nearest.code }) {
+                        buildNearestCard(nearest, station: station)
+                            .padding(.top, 14)
+                            .padding(.bottom, 6)
+                    }
                     ForEach(stations, id: \.code) { item in
                         buildRowView(item)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .padding(.top, 24)
+        }
+
+        private func open(_ station: DTO.Station) {
+            selectedStation = station
+            isPresentedDetail = true
+        }
+
+        private func buildNearestCard(_ nearest: NearestStation.Suggestion, station: DTO.Station) -> some View {
+            let distance = nearest.distanceKm.formatted(.number.precision(.fractionLength(1)))
+            return Button {
+                open(station)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "location.viewfinder")
+                        .font(.title2)
+                        .foregroundStyle(Signal.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Nearest to you · \(distance) km")
+                            .font(Signal.caption)
+                            .textCase(.uppercase)
+                            .tracking(1)
+                            .foregroundStyle(Color(red: 1, green: 138.0 / 255, blue: 92.0 / 255))
+                        Text(nearest.name)
+                            .font(.system(.title3).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 14)
+                .frame(minHeight: 68)
+                .background(Signal.onSignal)
+                .overlay(Rectangle().stroke(Signal.rule, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("stations.nearest")
         }
         
         private func buildRowView(_ item: DTO.Station) -> some View {
-            Button(action: {
-                selectedStation = item
-                isPresentedDetail = true
-            }) {
-                HStack {
-                    Text(item.name)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
+            // stations rebuilt from the database carry no state history: don't call them closed
+            let isClosed = !item.states.isEmpty && !NearestStation.isOperating(item)
+            return VStack(spacing: 0) {
+                Button {
+                    open(item)
+                } label: {
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(isClosed ? Signal.muted.opacity(0.5) : Signal.orange)
+                            .frame(width: 8, height: 8)
+                        Text(item.name)
+                            .font(.system(.body).weight(.semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        if isClosed {
+                            Text("closed")
+                                .font(Signal.caption)
+                                .foregroundStyle(Signal.muted)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .frame(minHeight: 62)
+                    .contentShape(Rectangle())
                 }
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
-                .shadow(radius: 2)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("stations.row.\(item.code)")
+                SignalRule()
             }
-            .accessibilityIdentifier("stations.row.\(item.code)")
         }
         
         /*

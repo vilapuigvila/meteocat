@@ -27,11 +27,26 @@ final class TabBarViewModel: ObservableObject {
 
         // one interactor, shared by the Stations tab and the launch call, so the list is requested once
         let stationsInteractor = StationsListInteractorImpl(databaseManager: DatabaseManager.shared)
-        stationsViewModel = StationsListViewModel(interactor: stationsInteractor)
 
         // The app host of the unit tests launches the real app: it must not show a permission prompt there,
         // nor read the location.
         let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+        let loadStations: () async -> [DTO.Station] = {
+            // joins the launch request in flight; the coordinates come from the cached list (15 days)
+            guard await stationsInteractor.ensureStationsAvailable() else { return [] }
+            return (try? await ServerData.request(.stations(forceRefresh: false))) ?? []
+        }
+
+        // The Stations tab offers the closest station even when the user already has a home station.
+        stationsViewModel = StationsListViewModel(
+            interactor: stationsInteractor,
+            nearestStationSuggester: isRunningUnitTests ? nil : NearestStationSuggester(
+                location: CoreLocationOneShotReader(),
+                loadStations: loadStations,
+                hasHomeStation: { false }
+            )
+        )
 
         homeViewModel = HomeStationViewModel(
             stationName: nil,
@@ -40,11 +55,7 @@ final class TabBarViewModel: ObservableObject {
                 databaseManager: DatabaseManager.shared,
                 nearestStationSuggester: isRunningUnitTests ? nil : NearestStationSuggester(
                     location: CoreLocationOneShotReader(),
-                    loadStations: {
-                        // joins the launch request in flight; the coordinates come from the cached list (15 days)
-                        guard await stationsInteractor.ensureStationsAvailable() else { return [] }
-                        return (try? await ServerData.request(.stations(forceRefresh: false))) ?? []
-                    }
+                    loadStations: loadStations
                 )
             )
         )

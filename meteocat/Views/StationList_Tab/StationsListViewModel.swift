@@ -13,10 +13,15 @@ final class StationsListViewModel: ObservableObject {
     
     @Published
     private(set) var state: StationsList.ViewState = .idle
+    /// The operating station closest to the user. `nil` until known, and when the location isn't allowed.
+    @Published
+    private(set) var nearest: NearestStation.Suggestion?
     private let interactor: StationsListInteractorProtocol
+    private let nearestStationSuggester: NearestStationSuggesting?
     
-    init(interactor: StationsListInteractorProtocol) {
+    init(interactor: StationsListInteractorProtocol, nearestStationSuggester: NearestStationSuggesting? = nil) {
         self.interactor = interactor
+        self.nearestStationSuggester = nearestStationSuggester
         registerPublisher()
     }
     
@@ -24,10 +29,19 @@ final class StationsListViewModel: ObservableObject {
         switch action {
         case .onAppear:
             interactor.useCase(.requestStations)
+            refreshNearest()
         case .onDisappear:
             interactor.useCase(.cancelRequestStations)
         case .pullToRefresh:
             interactor.useCase(.pullToRefresh)
+        }
+    }
+    
+    private func refreshNearest() {
+        guard let nearestStationSuggester else { return }
+        Task { @MainActor [weak self] in
+            let suggestion = await nearestStationSuggester.suggestion()
+            self?.nearest = suggestion
         }
     }
     

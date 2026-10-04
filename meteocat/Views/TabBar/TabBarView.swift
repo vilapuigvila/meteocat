@@ -13,6 +13,7 @@ struct TabBarView: View {
     
     init(homeStation: PREF.HomeStation? = nil) {
         _viewModel = StateObject(wrappedValue: TabBarViewModel(homeStation: homeStation))
+        Signal.configureTabBar()
     }
     
     var body: some View {

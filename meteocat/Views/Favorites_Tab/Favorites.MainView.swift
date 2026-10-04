@@ -10,9 +10,9 @@ import SwiftUI
 import Alfy
 
 struct FavoritesView: View {
-    
+
     @ObservedObject var viewModel: FavoritesViewModel
-    
+
     var body: some View {
         Favorites.MainView(state: viewModel.stateView) {
             viewModel.action($0)
@@ -21,21 +21,16 @@ struct FavoritesView: View {
 }
 
 extension Favorites {
-    
+
     struct MainView: View {
-        
+
         let state: Favorites.ViewState
         let action: (Favorites.Action) -> Void
-        
+
         @State private var selectedItem: Favorites.Representable?
         @State private var isPresentedSheet = false
         @State private var currentDetent = PresentationDetent.large
-        
-        private let columns = [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible())
-        ]
-        
+
         var body: some View {
             ZStack {
                 if case .idle = state {
@@ -58,19 +53,31 @@ extension Favorites {
                 if case .loaded(let representable) = state {
                     NavigationStack {
                         ScrollView {
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(representable) { item in
-                                    buildCardView(item)
-                                        .transition( .opacity)
-                                        .animation(.easeOut(duration: 0.5), value: state.result)
-                                        .onTapGesture {
-                                            selectedItem = item
-                                        }
+                            VStack(spacing: 0) {
+                                buildHeader()
+
+                                VStack(spacing: 0) {
+                                    buildColumnTitles()
+                                    SignalRule(color: Signal.ink)
+                                    ForEach(representable) { item in
+                                        buildRowView(item)
+                                            .transition( .opacity)
+                                            .animation(.easeOut(duration: 0.5), value: state.result)
+                                    }
+                                    Text("Bar: day range between -10 and 40 °C. Rain in mm.")
+                                        .font(Signal.caption)
+                                        .foregroundStyle(Signal.muted)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, 12)
                                 }
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 24)
                             }
-                            .padding()
                         }
+                        .signalTopFill()
+                        .background(Signal.paper.ignoresSafeArea())
                         .navigationTitle("Favorites")
+                        .toolbar(.hidden, for: .navigationBar)
                         .onChange(of: selectedItem) { _, newValue in
                             guard newValue != nil else {
                                 return
@@ -96,23 +103,54 @@ extension Favorites {
                             }
                         }
                     }
-                    
+
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: state)
-            .background(Color.black)
+            .background(Signal.paper.ignoresSafeArea())
             .onAppear {
                 action(.onAppear)
             }
         }
-        
-        private func buildCardView(_ item: Favorites.Representable) -> some View {
-            Favorites.CardView(item: item)
-                .frame(maxWidth: .infinity)
-                .padding(12)
-                .background(Color.blue.opacity(0.3))
-                .cornerRadius(8)
-                .accessibilityIdentifier("favorites.card.\(item.stationCode)")
+
+        private func buildHeader() -> some View {
+            SignalHeader {
+                SignalKicker("Today · \(Date().formatted(.dateTime.day().month(.abbreviated)))")
+                    .frame(minHeight: 44, alignment: .leading)
+                Text("Favorites")
+                    .font(.system(size: 48, weight: .light))
+                    .tracking(-1.4)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.top, 4)
+            }
+        }
+
+        private func buildColumnTitles() -> some View {
+            HStack(spacing: 0) {
+                Text("STATION")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("MAX").frame(width: Favorites.RowView.columnWidth, alignment: .trailing)
+                Text("MIN").frame(width: Favorites.RowView.columnWidth, alignment: .trailing)
+                Text("RAIN").frame(width: Favorites.RowView.columnWidth, alignment: .trailing)
+            }
+            .font(Signal.caption)
+            .tracking(1)
+            .foregroundStyle(Signal.muted)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+            .accessibilityHidden(true)
+        }
+
+        private func buildRowView(_ item: Favorites.Representable) -> some View {
+            Button {
+                selectedItem = item
+            } label: {
+                Favorites.RowView(item: item)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("favorites.card.\(item.stationCode)")
         }
     }
 }
@@ -131,71 +169,78 @@ extension Favorites {
         ])
     }
     return Favorites.MainView(state: mockviewModel) { _ in
-        
+
     }
 }
 
 extension Favorites {
-    
-    struct CardView: View {
+
+    /// One favourite station: name with its day range, then max, min and rain.
+    struct RowView: View {
+        static let columnWidth: CGFloat = 66
+
         let item: Favorites.Representable
-        
+
+        /// The scale of the range bar, in °C. Catalonia's stations run from deep winter to heat waves.
+        private static let scale: ClosedRange<Double> = -10...40
+
         var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(item.name)
-                    .font(.custom("Poppins-Bold", size: 19))
-                    .lineLimit(1)
-                    .foregroundStyle(.white.opacity(0.925))
-                    .bold()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "cloud.rain")
-                            .resizable()
-                            .scaledToFit()
-                            .foregroundStyle(.blue)
-                            .frame(width: 16, height: 16)
-                            .overlay(
-                                Group {
-                                    if item.rainAcc == "--" {
-                                        GeometryReader { geo in
-                                            Path { path in
-                                                path.move(to: CGPoint(x: 0, y: geo.size.height))
-                                                path.addLine(to: CGPoint(x: geo.size.width, y: 0))
-                                            }
-                                            .stroke(Color.red.opacity(0.8), lineWidth: 1.5)
-                                        }
-                                    }
-                                }
-                            )
-                        Text(item.rainAcc)
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(item.name)
+                            .font(.system(.body).weight(.semibold))
                             .lineLimit(1)
-                            .font(.custom("Poppins-Bold", size: 12))
-                            .foregroundStyle(
-                                item.rainAcc == "--"
-                                  ? Color.red.opacity(0.8)
-                                  : Color.teal.opacity(0.9)
-                            )
+                        buildRangeBar()
                     }
-                    
-                    HStack {
-                        Text(item.maxTemp)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .font(.custom("Poppins-Bold", size: 12))
-                            .foregroundStyle(.red)
-                        
-                        Spacer()
-                        
-                        Text(item.minTemp)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .font(.custom("Poppins-Bold", size: 12))
-                            .foregroundStyle(.mint.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 8)
+
+                    buildFigure(Self.figure(item.maxTemp), suffix: "°", color: Signal.ink)
+                    buildFigure(Self.figure(item.minTemp), suffix: "°", color: Signal.muted)
+                    buildFigure(Self.figure(item.rainAcc), suffix: "", color: Signal.ink, small: true)
+                }
+                .frame(minHeight: 72)
+                .contentShape(Rectangle())
+                SignalRule()
+            }
+        }
+
+        private func buildFigure(_ text: String, suffix: String, color: Color, small: Bool = false) -> some View {
+            Text(text == "--" || text.isEmpty ? "--" : text + suffix)
+                .font(small ? Signal.caption : Signal.figureSmall)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .foregroundStyle(color)
+                .frame(width: Self.columnWidth, alignment: .trailing)
+        }
+
+        /// Nothing is drawn when a value is missing.
+        @ViewBuilder
+        private func buildRangeBar() -> some View {
+            if let low = StationValue.number(from: item.minTemp), let high = StationValue.number(from: item.maxTemp) {
+                let span = Self.scale.upperBound - Self.scale.lowerBound
+                let start = (min(max(low, Self.scale.lowerBound), Self.scale.upperBound) - Self.scale.lowerBound) / span
+                let end = (min(max(high, Self.scale.lowerBound), Self.scale.upperBound) - Self.scale.lowerBound) / span
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(Signal.track)
+                        Rectangle()
+                            .fill(Signal.orange)
+                            .frame(width: max(2, geo.size.width * CGFloat(end - start)))
+                            .offset(x: geo.size.width * CGFloat(start))
                     }
                 }
+                .frame(height: 4)
+                .accessibilityHidden(true)
+            } else {
+                Color.clear.frame(height: 4)
             }
+        }
+
+        /// `"19.1 °C"` → `"19.1"`.
+        private static func figure(_ text: String) -> String {
+            text.split(separator: " ").first.map(String.init) ?? text
         }
     }
 }
-

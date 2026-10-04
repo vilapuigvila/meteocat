@@ -10,9 +10,9 @@ import Combine
 import Alfy
 
 struct HomeStationView: View {
-    
+
     @ObservedObject var viewModel: HomeStationViewModel
-    
+
     var body: some View {
         HomeStation.MainView(source: .home, state: viewModel.stateView) {
             viewModel.action($0)
@@ -28,40 +28,37 @@ fileprivate enum MonthMetric: String, Identifiable {
 }
 
 extension HomeStation {
-    
+
     struct MainView: View /*, DecoupledView*/ {
         enum Source {
             case home, detail, modal
         }
 
-        @Environment(\.colorScheme) private var colorScheme
         @Environment(\.scenePhase) private var scenePhase
-        
+
         @State private var showCurrentWeather = false {
             willSet { precondition(source == .home, "Only the ☢️ -> `.home` source supports showing the current weather") }
         }
 
         @State private var monthMetricSheet: MonthMetric?
-        
+
         @State private var selectedDate = Date()
         @State private var isDatePickerVisible = true
         @State private var isLoading = false
         @State private var hasAppeared = false
         @State private var _stateView: HomeStation.ViewState = .idle
-        
+
         let source: Source
         let state: HomeStation.ViewState
         let action: (HomeStation.Action) -> Void
-	
-        private let contentHorizontalPadding: CGFloat = 0
-	
+
 	        var body: some View {
             ZStack {
                 if case .error(let kind) = state {
                     switch kind {
                     case .missingStationCode:
                         MissingStationErrorView()
-                            .transition(.opacity)   
+                            .transition(.opacity)
                     case .networkFailure:
                         NetworkFailureErrorView()
                             .transition(.opacity)
@@ -100,7 +97,7 @@ extension HomeStation {
                                 missingDays: representable.missingDays
                             )
                         }
-                    
+
                     if source == .home {
                         VStack {
                             Spacer()
@@ -112,13 +109,14 @@ extension HomeStation {
                                 } label: {
                                     Image(systemName: "cloud.sun.fill")
                                         .font(.title2)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Signal.onSignal)
                                         .padding(20)
                                 }
                                 .background(Color.accentColor)
                                 .clipShape(Circle())
                                 .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                                 .padding()
+                                .accessibilityLabel("Current weather")
                             }
                         }
                     }
@@ -160,123 +158,126 @@ extension HomeStation {
             guard let name = state.representable?.name else { return true }
             return name.isEmpty
         }
-        
+
         private func buildListView(_ representable: HomeStation.Representable) -> some View {
-            VStack {
-                List {
-                    Section(
-                        header: buildHeaderView(representable)
-                            .listRowInsets(EdgeInsets())
-                    ) {
-                        ForEach(representable.values.indices, id: \.self) { idx in
-                            let item = representable.values[idx]
-                            buildRow(
-                                key: item.key,
-                                value: item.value,
-                                time: item.time,
-                                idx: idx
-                            )
-                            .padding([.top, .bottom], 12)
+            ScrollView {
+                VStack(spacing: 0) {
+                    buildHeaderView(representable)
+
+                    VStack(spacing: 0) {
+                        buildDatePicker()
+                        buildMonthSummaryView(representable)
+                        ForEach(Array(rows(of: representable).enumerated()), id: \.offset) { _, item in
+                            buildRow(key: item.key, value: item.value, time: item.time)
                         }
                     }
-                }
-                .listStyle(.insetGrouped)
-                .listRowSeparator(.visible)
-            }
-        }
-        private func buildHeaderTitle(_ representable: HomeStation.Representable) -> some View {
-            HStack {
-                switch source {
-                case .home:
-                    Text(representable.name)
-                        .font(.custom("san francisco display", size: 28))
-                        .fontWeight(.bold)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, maxHeight: 44)
-                        .accessibilityIdentifier("station.title")
-                case .modal:
-                    buildModalCaseView(representable)
-                case .detail:
-                    buildDetailCaseView(representable)
+                    .padding(.horizontal, Sizes.contentMargin + 4)
+                    // keeps the last row clear of the floating weather button
+                    .padding(.bottom, source == .home ? 88 : 24)
                 }
             }
+            .signalTopFill()
+            .background(Signal.paper.ignoresSafeArea())
         }
-        
-        private func buildDetailCaseView(_ representable: HomeStation.Representable) -> some View {
-            Group {
-                buildFavoriteButton(representable)
-                Spacer()
-                
+
+        /// The average temperature is the big figure in the header, so it isn't repeated in the rows.
+        private func rows(of representable: HomeStation.Representable) -> [HomeStation.Representable.Values] {
+            representable.values.filter { !isAverageTemp($0) }
+        }
+
+        private func isAverageTemp(_ value: HomeStation.Representable.Values) -> Bool {
+            StationValue.normalize(value.key).contains(StationValue.averageTempKey)
+        }
+
+        // MARK: Header
+
+        private var headerKicker: String {
+            switch source {
+            case .home: return "My station"
+            case .detail: return "Station"
+            case .modal: return "Favorite"
+            }
+        }
+
+        private func buildHeaderView(_ representable: HomeStation.Representable) -> some View {
+            SignalHeader {
+                HStack(spacing: 4) {
+                    SignalKicker(headerKicker)
+                    Spacer(minLength: 8)
+                    buildHeaderButtons(representable)
+                }
+                .frame(minHeight: Sizes.touchSize)
+
                 Text(representable.name)
+                    .font(Signal.title)
                     .lineLimit(2)
-                    .font(.custom("san francisco display", size: 28))
-                    .fontWeight(.bold)
+                    .padding(.top, 10)
                     .accessibilityIdentifier("station.title")
-                
-                Spacer()
-                
+
+                Text(selectedDate.formatted(date: .abbreviated, time: .standard))
+                    .font(Signal.caption)
+                    .padding(.top, 6)
+
+                buildHero(representable)
+            }
+            // The sheet has no navigation bar: without this the title sits on the grabber and the heart in the corner.
+            .padding(.top, source == .modal ? Sizes.contentMargin : 0)
+        }
+
+        @ViewBuilder
+        private func buildHeaderButtons(_ representable: HomeStation.Representable) -> some View {
+            switch source {
+            case .home:
+                EmptyView()
+            case .modal:
+                buildFavoriteButton(representable)
+            case .detail:
+                buildFavoriteButton(representable)
                 buildHomeButton(representable)
             }
         }
 
-        private func buildModalCaseView(_ representable: HomeStation.Representable) -> some View {
-            ZStack {
-                // Center text with padding to avoid button
-                HStack {
-                    // Invisible spacer that matches button width
-                    Spacer()
-                        .frame(width: Sizes.iconSize*1.5)
-                    
-                    // Centered text
-                    Text(representable.name)
-                        .lineLimit(2)
-                        .font(.custom("San Francisco Display", size: 28))
-                        .fontWeight(.bold)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("station.title")
-                    
-                    // Invisible spacer for symmetry
-                    Spacer()
-                        .frame(width: Sizes.iconSize*1.5)
-                }
-                
-                // Button layer at the leading edge
-                HStack {
-                    buildFavoriteButton(representable)
-                    Spacer()
+        @ViewBuilder
+        private func buildHero(_ representable: HomeStation.Representable) -> some View {
+            if let mean = representable.values.first(where: isAverageTemp) {
+                // "17.0 °C" → "17.0" large, "°C" small
+                let parts = mean.value.split(separator: " ", maxSplits: 1).map(String.init)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(mean.key)
+                        .font(Signal.caption)
+                        .padding(.top, 14)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(parts.first ?? mean.value)
+                            .font(Signal.hero())
+                            .tracking(-3)
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                        if parts.count > 1 {
+                            Text(parts[1])
+                                .font(.system(size: 32, weight: .light))
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("station.hero")
                 }
             }
         }
-        
-	        private func buildHeaderView(_ representable: HomeStation.Representable) -> some View {
-	            VStack {
-	                VStack {
-	                    buildHeaderTitle(representable)
-                    
-                    Text(selectedDate.formatted(date: .abbreviated, time: .standard))
-                        .font(.custom("Poppins-Bold", size: 14))
-                    
-	                    buildMonthSummaryView(representable)
-	                }
-	                .padding(.horizontal, contentHorizontalPadding)
-	                .padding(.bottom, 16)
-	//                .redacted(reason: isRedacted ? .placeholder : [])
-	
-	                DatePicker(
-	                    "Select Date",
+
+        // MARK: Content
+
+        private func buildDatePicker() -> some View {
+            VStack(spacing: 0) {
+                DatePicker(
+                    "Select Date",
                     selection: $selectedDate, in: ...Date(),
                     displayedComponents: [.date]
-	                )
-	                .datePickerStyle(CompactDatePickerStyle())
-	                .padding(.horizontal, contentHorizontalPadding)
-	                .padding(.bottom, 20)
-	                .id(selectedDate.timeIntervalSince1970)
-	                .accessibilityIdentifier("station.datePicker")
+                )
+                .datePickerStyle(CompactDatePickerStyle())
+                .padding(.vertical, 12)
+                .id(selectedDate.timeIntervalSince1970)
+                .accessibilityIdentifier("station.datePicker")
+                SignalRule()
             }
-            .frame(maxWidth: .infinity)
-            // The sheet has no navigation bar: without this the title sits on the grabber and the heart in the corner.
-            .padding(.top, source == .modal ? Sizes.contentMargin : 0)
         }
 
         @ViewBuilder
@@ -286,102 +287,52 @@ extension HomeStation {
             if hasAverageTemp || hasAccumulatedRain {
                 HStack(spacing: 12) {
                     if hasAverageTemp {
-                        buildSummaryTile(
-                            title: "Mitjana (mes)",
-                            value: representable.averageTemp,
-                            keyForIcon: "Temperatura mitjana"
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .onTapGesture {
+                        Button {
                             monthMetricSheet = .averageTemp
+                        } label: {
+                            SignalTile(title: "Mitjana (mes)", value: representable.averageTemp)
                         }
+                        .buttonStyle(.plain)
                     }
                     if hasAccumulatedRain {
-                        buildSummaryTile(
-                            title: "Acumulada (mes)",
-                            value: representable.accumulatedRain,
-                            keyForIcon: "Precipitació acumulada"
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .onTapGesture {
+                        Button {
                             monthMetricSheet = .accumulatedRain
+                        } label: {
+                            SignalTile(title: "Acumulada (mes)", value: representable.accumulatedRain, filled: true)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
+                .padding(.vertical, 16)
             }
         }
 
-        private func buildSummaryTile(title: String, value: String, keyForIcon: String) -> some View {
-            let icon = color(forKey: keyForIcon)
-            return HStack(spacing: 10) {
-                if let icon {
-                    Image(systemName: icon.imageName)
-                        .foregroundStyle(icon.color)
-                        .font(.system(size: 18, weight: .semibold))
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.custom("Poppins-Bold", size: 12))
-                        .foregroundStyle(.secondary)
+        private func buildRow(key: String, value: String, time: String?) -> some View {
+            VStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(key)
+                        .font(Signal.rowTitle)
+                    Spacer(minLength: 8)
                     Text(value)
-                        .font(.custom("Poppins-Bold", size: 14))
-                        .foregroundStyle(icon?.color ?? .primary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        
-        private func buildRow(key: String, value: String, time: String?, idx: Int) -> some View {
-            Group {
-                if let values = color(forKey: key) {
-                    VStack(alignment: .trailing, spacing: 8) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Image(systemName: values.imageName)
-                                .foregroundStyle(values.color)
-                                .offset(x: -2)
-                            
-                            Text("\(key)")
-                                .padding(.leading, 8)
-                            Spacer()
-                            
-                            Text("\(value)")
-                                .foregroundStyle(values.color)
-                        }
-                        if let date = time {
-                            Text(date)
-                                .font(.custom("Poppins-Bold", size: 12))
-                                .foregroundStyle(.gray)
-                        }
-                    }
-                } else {
-                    VStack(alignment: .trailing, spacing: 8) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("\(key)")
-                            Spacer()
-                            Text("\(value)")
-                            
-                            if let date = time {
-                                Text(date)
-                                    .font(.custom("Poppins-Bold", size: 12))
-                                    .foregroundStyle(.gray)
-                            }
-                        }
+                        .font(Signal.figure)
+                    if let time {
+                        Text(time)
+                            .font(Signal.caption)
+                            .foregroundStyle(Signal.muted)
                     }
                 }
+                .padding(.vertical, 14)
+                SignalRule()
             }
         }
-        
+
+        // MARK: Buttons
+
         @State private var showSparks = false
         private func buildFavoriteButton(_ representable: HomeStation.Representable) -> some View {
             Button {
                 feedbackGenerator(success: !representable.isFavorite)
-                
+
                 showSparks = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     showSparks = false
@@ -392,12 +343,9 @@ extension HomeStation {
             } label: {
                 ZStack {
                     Image(systemName: !representable.isFavorite ? "heart" : "heart.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .foregroundStyle(colorScheme == .dark ? .white : .black)
-                        .frame(width: Sizes.iconSize, height: Sizes.iconSize)
+                        .font(.system(size: Sizes.iconSize - 2, weight: .regular))
                         .animation(.spring(), value: representable.isFavorite)
-                    
+
                     if showSparks, source != .home {
                         SparkView(isAddinng: !representable.isFavorite)
                             .frame(width: 24, height: 24)
@@ -405,9 +353,8 @@ extension HomeStation {
                     }
                 }
             }
-            .frame(width: Sizes.touchSize, height: Sizes.touchSize)
-            // Keep the 44 pt touch target but lay out only the glyph, so it sits on the content margin
-            .padding(.horizontal, -(Sizes.touchSize - Sizes.iconSize) / 2)
+            .buttonStyle(SignalIconButtonStyle(filled: representable.isFavorite))
+            .accessibilityLabel(representable.isFavorite ? "Remove from favorites" : "Add to favorites")
             .accessibilityIdentifier("station.favoriteButton")
         }
 
@@ -422,15 +369,12 @@ extension HomeStation {
                     ))
                 }
             } label: {
-                Image(systemName: representable.isHome ? "house.circle.fill" : "house.slash")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(representable.isHome ? Color.green.opacity(0.5) : Color.gray)
-                    .frame(width: Sizes.iconSize, height: Sizes.iconSize)
+                Image(systemName: representable.isHome ? "house.fill" : "house")
+                    .font(.system(size: Sizes.iconSize - 2, weight: .regular))
                     .animation(.spring(), value: representable.isHome)
             }
-            .frame(width: Sizes.touchSize, height: Sizes.touchSize)
-            .padding(.horizontal, -(Sizes.touchSize - Sizes.iconSize) / 2)
+            .buttonStyle(SignalIconButtonStyle(filled: representable.isHome))
+            .accessibilityLabel(representable.isHome ? "Remove as my station" : "Set as my station")
             .accessibilityIdentifier("station.homeButton")
         }
         private func feedbackGenerator(success: Bool) {
@@ -438,31 +382,7 @@ extension HomeStation {
             generator.prepare()
             generator.notificationOccurred(success ? .success : .error)
         }
-        private func color(forKey key: String) -> (color: Color, imageName: String)? {
-            func normalized(_ string: String) -> String {
-                string.folding(options: .diacriticInsensitive, locale: .current).lowercased()
-            }
-            let normalizedKey = normalized(key)
-            switch true {
-            case normalizedKey.contains("temperatura mitjana"):
-                return (.green, "thermometer.medium")
-            case normalizedKey.contains("temperatura maxima"):
-                return (.red, "thermometer.sun")
-            case normalizedKey.contains("temperatura minima"):
-                return (.blue, "thermometer.snowflake")
-            case normalizedKey.contains("humitat"):
-                return (.cyan, "humidity.fill")
-            case normalizedKey.contains("vent"):
-                return (.gray, "wind")
-            case normalizedKey.contains("pressio atmosferica"):
-                return nil
-            case normalizedKey.contains("precipitacio"):
-                return (.cyan, "cloud.rain") // value.contains("0.") ? "cloud" :
-            default:
-                return nil
-            }
-        }
-        
+
         private enum Sizes {
             static let iconSize: CGFloat = 24
             static let touchSize: CGFloat = 44
@@ -486,28 +406,29 @@ private struct MonthSummarySheet: View {
                     ForEach(monthValues, id: \.date) { day in
                         HStack(spacing: 12) {
                             Image(systemName: iconName)
-                                .foregroundStyle(tintColor)
+                                .foregroundStyle(Signal.orange)
 
                             Text(day.date.formatted(date: .abbreviated, time: .omitted))
-                                .font(.custom("Poppins-Bold", size: 14))
+                                .font(Signal.rowTitle)
 
                             Spacer()
 
                             if day.isPartial {
                                 Text("parcial")
-                                    .font(.custom("Poppins-Bold", size: 12))
-                                    .foregroundStyle(.secondary)
+                                    .font(Signal.caption)
+                                    .foregroundStyle(Signal.muted)
                             }
                             Text(value(for: day))
-                                .font(.custom("Poppins-Bold", size: 14))
-                                .foregroundStyle(tintColor)
+                                .font(Signal.figure)
                         }
                         .padding(.vertical, 6)
                     }
                 } footer: {
                     Text(footerText)
+                        .font(Signal.caption)
                 }
             }
+            .listStyle(.plain)
             .navigationTitle("\(stationName) · \(title)")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -539,15 +460,6 @@ private struct MonthSummarySheet: View {
             return "thermometer.medium"
         case .accumulatedRain:
             return "cloud.rain"
-        }
-    }
-
-    private var tintColor: Color {
-        switch metric {
-        case .averageTemp:
-            return .green
-        case .accumulatedRain:
-            return .cyan
         }
     }
 
@@ -589,7 +501,7 @@ private struct MonthSummarySheet: View {
             },
             missingDays: 0
         ))) { _ in
-                
+
             }
         Spacer()
     }
