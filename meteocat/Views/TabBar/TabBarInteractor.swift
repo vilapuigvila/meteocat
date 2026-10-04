@@ -15,6 +15,14 @@ protocol TabBarInteractorProtocol {
 final class TabBarInteractorImpl: TabBarInteractorProtocol {
     enum UseCase {
         case appDidStart
+        case appDidBecomeActive
+    }
+
+    private let launchLocationPermission: LaunchLocationPermission?
+
+    /// `launchLocationPermission` is nil when the app must not ask (unit tests).
+    init(launchLocationPermission: LaunchLocationPermission? = nil) {
+        self.launchLocationPermission = launchLocationPermission
     }
 
     private static var didPrefetchFavoritesMonthToDate = false
@@ -30,6 +38,11 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
                 await Self.prefetchFavoritesMonthToDate()
                 let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
                 print("avpv - Prefetch completed in \(timeElapsed) seconds")
+            }
+        case .appDidBecomeActive:
+            guard let launchLocationPermission else { return }
+            Task { @MainActor in
+                await launchLocationPermission.run()
             }
         }
     }

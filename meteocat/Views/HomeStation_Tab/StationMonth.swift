@@ -76,6 +76,29 @@ struct DayKey: Hashable, Comparable, Sendable {
         !isComplete(fetchedAt: fetchedAt) && now.timeIntervalSince(fetchedAt) >= Self.refreshInterval
     }
 
+    /// How long Alfy may serve the downloaded page of this day. A day that can still change lives
+    /// `refreshInterval`, like its database row. A final day gets `now - (utcEnd + settleDelay)`: Alfy treats a page
+    /// as fresh only while it's younger than that, so only a page downloaded after the day settled can be reused,
+    /// and one downloaded earlier (a partial day) is fetched again.
+    ///
+    /// The first hour of a day is the exception: meteo.cat can answer it with a page that has no table yet, and
+    /// Alfy caches that like any other 200, so the "no data yet" state would outlive the data by up to an hour.
+    func cacheTTL(now: Date) -> TimeInterval {
+        let settledAt = utcEnd.addingTimeInterval(Self.settleDelay)
+        if now >= settledAt {
+            return now.timeIntervalSince(settledAt)
+        }
+        if now < utcStart.addingTimeInterval(Self.emptyPageWindow) {
+            return Self.emptyPageTTL
+        }
+        return Self.refreshInterval
+    }
+
+    /// How long into a day meteo.cat may still answer with an empty page, and how long that page may be cached.
+    /// 5 minutes is the `max-age` the server itself sends.
+    static let emptyPageWindow: TimeInterval = 3600
+    static let emptyPageTTL: TimeInterval = 300
+
     // MARK: Helpers
 
     /// Local noon, a stable moment inside the day for display and for requests.

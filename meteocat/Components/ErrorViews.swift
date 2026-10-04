@@ -39,6 +39,56 @@ struct MissingStationErrorView: View {
     }
 }
 
+/// The empty My Station tab, with the closest station and a button to make it the user's station.
+struct NearestStationSuggestionView: View {
+    let suggestion: NearestStation.Suggestion
+    let onAdd: () -> Void
+    
+    private var distanceText: String {
+        "\(suggestion.distanceKm.formatted(.number.precision(.fractionLength(1)))) km"
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "mappin.and.ellipse")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
+                .foregroundColor(.orange)
+
+            Text("Closest station")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.primary)
+
+            Text(suggestion.name)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.primary)
+                .accessibilityIdentifier("suggestion.name")
+
+            Text(distanceText)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.primary)
+
+            Button("Add as My Station", action: onAdd)
+                .font(.headline)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("suggestion.addButton")
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(radius: 4)
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("suggestion.card")
+    }
+}
+
 /// A view that shows a fancy image when a network failure occurs.
 struct NetworkFailureErrorView: View {
     @State private var pulse = true

@@ -14,6 +14,7 @@ enum HomeStation: Hashable, Sendable {
         case loading
         case loaded(Representable)
         case error(ErrorView)
+        case suggestion(NearestStation.Suggestion)
         
         var values: [Representable.Values] {
             guard case .loaded(let result) = self else {

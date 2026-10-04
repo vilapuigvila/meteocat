@@ -1,0 +1,45 @@
+# Nearest station suggestion: on an empty My Station tab, with location permission allowed, the tab suggests the
+# closest operating station and "Add as My Station" makes it the home station. Needs network (meteo.cat).
+# Run against the booted Claude-Test simulator (build with `xcodebuild build` first and `xcrun simctl install` it):
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/nearest_station_suggestion.yaml
+# The screenshots land in <dir>/<timestamp>/nearest_station_suggestion/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+# A point right next to Orís (CC: 42.07397, 2.20865)
+- setLocation:
+    latitude: 42.0745
+    longitude: 2.2090
+
+# Clean install, no home station, location already allowed (no system prompt)
+- clearState
+- launchApp:
+    clearState: true
+    permissions:
+      location: inuse
+
+# My Station is empty: the suggestion appears once the stations list is available
+- tapOn: "My Station"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion.card"
+    timeout: 90000
+- assertVisible:
+    id: "suggestion.name"
+    text: "Orís"
+- assertVisible:
+    id: "suggestion.addButton"
+- takeScreenshot: nearest_station_suggestion_card
+
+# Add it: the tab loads the station
+- tapOn:
+    id: "suggestion.addButton"
+- extendedWaitUntil:
+    visible:
+      id: "station.title"
+    timeout: 60000
+- assertVisible:
+    id: "station.title"
+    text: "Orís"
+- assertNotVisible:
+    id: "suggestion.card"
+- takeScreenshot: nearest_station_suggestion_added

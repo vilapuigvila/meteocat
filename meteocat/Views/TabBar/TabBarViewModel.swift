@@ -7,12 +7,14 @@
 
 import Foundation
 import Combine
+import UIKit
 import Alfy
 
 @MainActor
 final class TabBarViewModel: ObservableObject {
     private let databaseManager: DatabaseManagerProtocol
     private let interactor: TabBarInteractorProtocol
+    private var cancellables: Set<AnyCancellable> = []
 
     let stationsViewModel: StationsListViewModel
     let homeViewModel: HomeStationViewModel
@@ -23,19 +25,52 @@ final class TabBarViewModel: ObservableObject {
             Model.Station.self, Model.InfoStationByDate.self
         ])
 
-        interactor = TabBarInteractorImpl()
+        // one interactor, shared by the Stations tab and the launch call, so the list is requested once
+        let stationsInteractor = StationsListInteractorImpl(databaseManager: DatabaseManager.shared)
+        stationsViewModel = StationsListViewModel(interactor: stationsInteractor)
+
+        // The app host of the unit tests launches the real app: it must not show a permission prompt there,
+        // nor read the location.
+        let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
         homeViewModel = HomeStationViewModel(
             stationName: nil,
-            interactor: HomeStationInteractorImpl(source: .homeStation, databaseManager: DatabaseManager.shared)
-        )
-        stationsViewModel = StationsListViewModel(
-            interactor: StationsListInteractorImpl(databaseManager: DatabaseManager.shared)
+            interactor: HomeStationInteractorImpl(
+                source: .homeStation,
+                databaseManager: DatabaseManager.shared,
+                nearestStationSuggester: isRunningUnitTests ? nil : NearestStationSuggester(
+                    location: CoreLocationOneShotReader(),
+                    loadStations: {
+                        // joins the launch request in flight; the coordinates come from the cached list (15 days)
+                        guard await stationsInteractor.ensureStationsAvailable() else { return [] }
+                        return (try? await ServerData.request(.stations(forceRefresh: false))) ?? []
+                    }
+                )
+            )
         )
         favsViewModel = FavoritesViewModel(
             interactor: FavoritesInteractorImpl(databaseManager: DatabaseManager.shared)
         )
 
+        interactor = TabBarInteractorImpl(
+            launchLocationPermission: isRunningUnitTests ? nil : LaunchLocationPermission(
+                ensureStations: { await stationsInteractor.ensureStationsAvailable() },
+                requester: CoreLocationPermissionRequester()
+            )
+        )
+
         interactor.useCase(.appDidStart)
+        observeAppActivation()
+    }
+
+    /// The location prompt only appears while the app is active, so it is asked on activation, not from `init`.
+    private func observeAppActivation() {
+        NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in self?.interactor.useCase(.appDidBecomeActive) }
+            .store(in: &cancellables)
+        if UIApplication.shared.applicationState == .active {
+            interactor.useCase(.appDidBecomeActive)
+        }
     }
 }

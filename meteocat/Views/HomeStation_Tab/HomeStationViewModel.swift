@@ -27,6 +27,8 @@ enum HomeStationStateDomain: Equatable, Sendable {
     case loading
     case loaded(dto: [DTO.HomeStation], stationCode: String, cityCode: String, isHome: Bool, monthInfo: [StationDayInfo], summary: StationDayInfoSummary)
     case error(HomeStationInteractorImpl.ErrorReason)
+    /// The empty My Station tab, with the closest station offered to the user.
+    case suggestion(NearestStation.Suggestion)
     
     var result: [DTO.HomeStation] {
         guard case .loaded(let dto, _, _, _, _, _) = self else {
@@ -179,6 +181,8 @@ final class HomeStationViewModel: ObservableObject {
             )
         case .error(let error):
             return .error(error.asHomeStationErrorView())
+        case .suggestion(let suggestion):
+            return .suggestion(suggestion)
         }
     }
 }

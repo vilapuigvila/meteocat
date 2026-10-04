@@ -28,7 +28,8 @@ protocol StationsListInteractorProtocol {
 
 final class StationsListInteractorImpl: StationsListInteractorProtocol {
 
-    private var requestStationsTask: Task<Void, Never>?
+    /// Resolves to `true` when the request ended with a non-empty list.
+    private var requestStationsTask: Task<Bool, Never>?
     private var cancellable: AnyCancellable?
     private let subject = CurrentValueSubject<StationsListDomain, Never>(.empty)
 
@@ -58,9 +59,21 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         }
     }
     
+    /// Makes sure the stations list is available: from the database when it is fresh, otherwise from the network.
+    /// Shares the request in flight with the Stations tab, so the list is never requested twice.
+    /// Returns `false` when no list could be obtained.
+    func ensureStationsAvailable() async -> Bool {
+        await loadStations()
+    }
+
     private func requestStations(pullToRefresh: Bool = false) async {
-        guard requestStationsTask == nil else {
-            return
+        _ = await loadStations(pullToRefresh: pullToRefresh)
+    }
+
+    @discardableResult
+    private func loadStations(pullToRefresh: Bool = false) async -> Bool {
+        if let task = requestStationsTask {
+            return await task.value
         }
         if let storedStations = await fetchStationsFromDatabase(), !pullToRefresh {
             subject.send(
@@ -71,11 +84,13 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
                     isLoading: false)
             )
             print("avp 📊 - stations list updated from db")
-        } else {
-            fetchAndStoreStations()
+            return true
         }
-#warning("avpv check it out ⚠️ -> remove")
-//        fetchAndStoreStations()
+        // another caller may have started the request while the database was being read
+        if let task = requestStationsTask {
+            return await task.value
+        }
+        return await fetchAndStoreStations(forceRefresh: pullToRefresh).value
     }
     
     /// Retrieves stored stations if they are not outdated
@@ -93,7 +108,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
             guard let lastUpdated = stations.first?.lastUpdated else {
                 return nil
             }
-            let isOutdated = Date(timeIntervalSince1970: lastUpdated).differenceInSecondsFromNow > 60 * 60 * 24 * 15 // 15 days
+            let isOutdated = Date(timeIntervalSince1970: lastUpdated).differenceInSecondsFromNow > Int(ServerData.CacheTTL.stations) // 15 days
             return isOutdated ? nil : stations
         } catch {
             return nil
@@ -101,31 +116,38 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     }
 
     /// Fetches stations from the API and stores them in the database
-    private func fetchAndStoreStations() {
+    /// `forceRefresh` makes the request skip Alfy's cache, which also holds the list for 15 days.
+    private func fetchAndStoreStations(forceRefresh: Bool) -> Task<Bool, Never> {
         subject.send(.init(list: [], isLoading: true))
         
-        requestStationsTask = Task { [weak self] in
+        let task = Task { [weak self] () -> Bool in
+            var didLoad = false
             do {
-                let result: [DTO.Station] = try await ServerData.request(.stations)
+                let result: [DTO.Station] = try await ServerData.request(.stations(forceRefresh: forceRefresh))
                 let sortedStations = result.sorted {
                     $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
                 }
                 self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
                 
                 guard !result.isEmpty else {
-                    return
+                    return false
                 }
+                didLoad = true
                 print("avpv 🛜 - stations from api")
                 
                 guard let self = self else {
-                    return nonFatalCrashlytics(false, "dataCorrupted")
+                    nonFatalCrashlytics(false, "dataCorrupted")
+                    return didLoad
                 }
                 try await self.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
             } catch {
                 nonFatalCrashlytics(false, error.localizedDescription)
             }
             self?.requestStationsTask = nil
+            return didLoad
         }
+        requestStationsTask = task
+        return task
     }
 
     func cancel() {

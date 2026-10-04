@@ -1,5 +1,5 @@
 //
-//  Requester.swift
+//  ServerData.swift
 //  meteocat
 //
 //  Created by albert vila on 31/10/24.
@@ -24,7 +24,8 @@ import Alfy
 struct ServerData {
     enum Service {
         case lastTemperature(forStationCode: String)
-        case stations
+        /// `forceRefresh` skips the cached list (pull-to-refresh) but still stores the response.
+        case stations(forceRefresh: Bool)
         case requestStation(code: String, date: Date = Date())
         case curentWeather(code: String)
     }
@@ -33,8 +34,8 @@ struct ServerData {
             switch service {
             case .lastTemperature(let forStationCode):
                 try await getLastTemperature(forStationCode: forStationCode)
-            case .stations:
-                await fetchStations()
+            case .stations(let forceRefresh):
+                await fetchStations(forceRefresh: forceRefresh)
             case .requestStation(let code, let date):
                 try await requestStation(code: code, date: date)
             case .curentWeather(let code):
@@ -44,6 +45,17 @@ struct ServerData {
         return decodable as! D
     }
     
+    /// How long Alfy's cache may answer each request, mirroring how long the app already keeps that data
+    /// (see `makeRequest`). Shared with the code that owns the database rule, so they can't drift apart.
+    enum CacheTTL {
+        /// `StationsListInteractorImpl` reuses the stored station list for 15 days.
+        static let stations: TimeInterval = 60 * 60 * 24 * 15
+        /// `Forecast.MainView` asks again after 5 minutes.
+        static let currentWeather: TimeInterval = 60 * 5
+        /// XEMA readings are half-hourly. No caller yet, so no database rule to mirror.
+        static let lastTemperature: TimeInterval = 60 * 30
+    }
+
     private static let meteocatToken = "7r5zloC5zs2MjyxAfdnkd1cvuUeKpvWQ9cONyuPh"
     private static let xApiKey: Requester.HeaderParam =
         .custom(headerField: "x-api-key", value: meteocatToken)
@@ -53,8 +65,49 @@ struct ServerData {
     /// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
     ///
     
+    /// The request for `service`, with the cache policy that mirrors the app's own database times.
+    ///
+    /// meteo.cat lets clients cache its pages for only 3-5 minutes, and Alfy follows that unless told otherwise,
+    /// so every policy here uses `.ignoreServer`: without it a `ttl` longer than the server's `max-age` does nothing.
+    /// Pure (no network, no clock but `now`), so the policy is unit tested.
+    static func makeRequest(for service: Service, now: Date = Date()) -> Requester.Request {
+        switch service {
+        case .requestStation(let code, let date):
+            // A cached page must never make a day look finished when it isn't, so stale-on-error is off:
+            // a partial page served after a network failure would be stored as a final day for ever.
+            return Requester
+                .makeRequest("https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(DayKey(date).requestParameter)")
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(DayKey(date).cacheTTL(now: now))
+                .allowStaleOnError(false)
+        case .stations(let forceRefresh):
+            // An old station list beats none, so stale-on-error stays on.
+            let request = Requester
+                .makeRequest("https://www.meteo.cat/observacions/xema")
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(CacheTTL.stations)
+                .allowStaleOnError(true)
+            return forceRefresh ? request.forceRefresh() : request
+        case .curentWeather(let code):
+            return Requester
+                .makeRequest("https://m.meteo.cat/?codi=\(code)")
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(CacheTTL.currentWeather)
+                .allowStaleOnError(true)
+        case .lastTemperature(let stationCode):
+            return Requester
+                .makeRequest("https://api.meteo.cat/xema/v1/variables/mesurades/32/ultimes?codiEstacio=\(stationCode)")
+                .header(xApiKey)
+                .cacheControlBehavior(.ignoreServer)
+                .ttl(CacheTTL.lastTemperature)
+                .allowStaleOnError(true)
+        }
+    }
+
     private static func getCurrentWeather(code: String) async throws -> DTO.CurrentWeather {
-        let data = try await Requester.request("https://m.meteo.cat/?codi=\(code)").data
+        let data = try await makeRequest(for: .curentWeather(code: code))
+            .send()
+            .data
         guard let html = String(data: data, encoding: .utf8) else {
             nonFatalCrashlytics(false, "dataCorrupted")
             throw Requester.ErrorReason.dataCorrupted
@@ -161,10 +214,9 @@ struct ServerData {
     
     static func getLastTemperature(forStationCode stationCode: String) async throws -> DTO.LastTemperature {
         do {
-            let data = try await Requester.request(
-                "https://api.meteo.cat/xema/v1/variables/mesurades/32/ultimes?codiEstacio=\(stationCode)",
-                headers: [ServerData.xApiKey]
-            ).data
+            let data = try await makeRequest(for: .lastTemperature(forStationCode: stationCode))
+                .send()
+                .data
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let lectures = json["lectures"] as? [[String: Any]],
                   let firstLecture = lectures.first,
@@ -180,7 +232,7 @@ struct ServerData {
         }
     }
     
-    private static func fetchStations() async -> [DTO.Station] {
+    private static func fetchStations(forceRefresh: Bool) async -> [DTO.Station] {
         /*
         do {
             let result = try await Requester.request(
@@ -194,7 +246,9 @@ struct ServerData {
         }
         */
         do {
-            let data = try await Requester.request("https://www.meteo.cat/observacions/xema").data
+            let data = try await makeRequest(for: .stations(forceRefresh: forceRefresh))
+                .send()
+                .data
             guard let html = String(data: data, encoding: .utf8) else {
                 nonFatalCrashlytics(false, "dataCorrupted")
                 return []
@@ -268,16 +322,14 @@ extension ServerData {
     }
 
     /// The daily summary of the UTC day with the same year-month-day as `date`'s (see `DayKey`).
-    static func requestStation(code: String, date: Date) async throws -> [DTO.HomeStation] {
+    static func requestStation(code: String, date: Date, now: Date = Date()) async throws -> [DTO.HomeStation] {
         nonFatalCrashlytics(!code.isEmpty, "")
 
-        let day = DayKey(date)
-
         do {
-            // meteo.cat lets clients cache this page for 5 minutes, well under `DayKey.settleDelay`,
-            // so a page served from the URL cache can't make a day look finished when it isn't.
-            let data = try await Requester
-                .request("https://www.meteo.cat/observacions/xema/dades?codi=\(code)&dia=\(day.requestParameter)")
+            // The cache lifetime comes from `DayKey.cacheTTL`, so a page served from the cache
+            // can't make a day look finished when it isn't (see `makeRequest`).
+            let data = try await makeRequest(for: .requestStation(code: code, date: date), now: now)
+                .send()
                 .data
             guard let htmlContent = String(data: data, encoding: .utf8) else {
                 throw NSError(domain: "Invalid data encoding", code: 0, userInfo: nil)

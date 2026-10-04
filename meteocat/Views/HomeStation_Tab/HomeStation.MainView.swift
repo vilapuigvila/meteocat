@@ -70,6 +70,16 @@ extension HomeStation {
                             .transition(.opacity)
                     }
                 }
+                if case .suggestion(let suggestion) = state {
+                    NearestStationSuggestionView(suggestion: suggestion) {
+                        action(.addAsHome(
+                            stationName: suggestion.name,
+                            code: suggestion.code,
+                            codeCity: suggestion.codeCity
+                        ))
+                    }
+                    .transition(.opacity)
+                }
                 if case .idle = state {
                   EmptyView()
                     .transition(.opacity)

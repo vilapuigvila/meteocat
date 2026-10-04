@@ -27,10 +27,17 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
     
     let source: Source
     let databaseManager: DatabaseManagerProtocol
+    /// Only the My Station tab suggests a station when it is empty.
+    private let nearestStationSuggester: NearestStationSuggesting?
     
-    init(source: Source, databaseManager: DatabaseManagerProtocol) {
+    init(
+        source: Source,
+        databaseManager: DatabaseManagerProtocol,
+        nearestStationSuggester: NearestStationSuggesting? = nil
+    ) {
         self.source = source
         self.databaseManager = databaseManager
+        self.nearestStationSuggester = nearestStationSuggester
     }
     
     private func cancel() {
@@ -47,7 +54,9 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             }
         case .requestStation(let date):
             guard let (stationCode, cityCode) = self.getCodesAccordingSource() else {
+                cancel()
                 subject.send(.error(.missingCode))
+                suggestNearestStation()
                 return
             }
             // A newer request replaces the one in progress: its answer must not overwrite ours.
@@ -103,11 +112,27 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         case .addAsHome(let stationName, let stationCode, let codeCity):
             if let stationCode, let stationName, let codeCity {
                 UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode, codeCity: codeCity)
+                if case .suggestion = domain, source == .homeStation {
+                    // `homeStationPublisher` doesn't emit on set: the tab loads the new station itself
+                    self.useCase(.requestStation(date: Date()))
+                    return
+                }
             } else {
                 UserSettings.homeStation = nil
             }
             let _domain = domain.copy(isHome: isHomeStation)
             subject.send(_domain)
+        }
+    }
+    
+    /// On the empty My Station tab: offers the closest station when it can be worked out, otherwise the empty state stays.
+    private func suggestNearestStation() {
+        guard source == .homeStation, let suggester = nearestStationSuggester else { return }
+        taskRequestStation = Task { @MainActor [weak self] in
+            guard let suggestion = await suggester.suggestion() else { return }
+            // the user may have left the tab or chosen a station while we were waiting
+            guard let self, !Task.isCancelled, UserSettings.homeStation == nil else { return }
+            self.subject.send(.suggestion(suggestion))
         }
     }
     

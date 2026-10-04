@@ -23,7 +23,7 @@ struct ForecastView: View {
 extension Forecast {
     
     struct MainView: View {
-        private static var requestTimeThreshold: Int { 60*5 }
+        private static var requestTimeThreshold: Int { Int(ServerData.CacheTTL.currentWeather) }
         
         @State private var onAppearDate: Date?
         

@@ -1,0 +1,36 @@
+# Launch location permission: the app asks for "When In Use" location only after the stations are available,
+# and only once. Needs network (meteo.cat) for the first launch. Run against the booted Claude-Test simulator:
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/launch_location_permission.yaml
+# The screenshots land in <dir>/<timestamp>/launch_location_permission/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+# Clean install, location permission never asked
+- clearState
+- launchApp:
+    clearState: true
+    permissions:
+      location: unset
+
+# The system prompt appears once the stations are available
+- extendedWaitUntil:
+    visible: "Allow While Using App"
+    timeout: 90000
+- takeScreenshot: launch_location_permission_prompt
+- tapOn: "Allow While Using App"
+
+# Relaunch without clearing state: no prompt, the Stations tab still lists Orís
+- stopApp
+- launchApp
+- tapOn: "Stations"
+- extendedWaitUntil:
+    visible: "Estacions"
+    timeout: 60000
+- assertNotVisible: "Allow While Using App"
+- tapOn: "Search stations"
+- inputText: "Orís"
+- extendedWaitUntil:
+    visible:
+      id: "stations.row.CC"
+    timeout: 30000
+- assertNotVisible: "Allow While Using App"
+- takeScreenshot: launch_location_permission_stations
