@@ -1,0 +1,111 @@
+import XCTest
+import Combine
+@testable import meteocatalf
+
+final class HomeStationViewModelTests: XCTestCase {
+
+    private final class InteractorStub: HomeStationInteractorProtocol {
+        let subject: CurrentValueSubject<HomeStationStateDomain, Never>
+        var domain: HomeStationStateDomain { subject.value }
+        var publisher: AnyPublisher<HomeStationStateDomain, Never> { subject.eraseToAnyPublisher() }
+        init(_ state: HomeStationStateDomain) { subject = .init(state) }
+        func useCase(_ useCase: HomeStationInteractorImpl.UseCase) {}
+    }
+
+    func testTilesShowUnitsAndMissingDays() {
+        let summary = StationDayInfoSummary(averageTemp: 14.4, accumulatedRain: 45.6, daysWithData: 3, daysExpected: 4)
+        let viewModel = HomeStationViewModel(
+            stationName: nil,
+            interactor: InteractorStub(.loaded(
+                dto: [.init(name: "Orís", key: "Temperatura mitjana", value: "17.0 °C", time: nil)],
+                stationCode: "CC", cityCode: "1", isHome: true, monthInfo: [], summary: summary
+            ))
+        )
+        // the view model hops to the main queue before publishing
+        let loaded = expectation(description: "loaded")
+        var representable: HomeStation.Representable?
+        let cancellable = viewModel.$stateView.sink {
+            guard let value = $0.representable else { return }
+            representable = value
+            loaded.fulfill()
+        }
+        wait(for: [loaded], timeout: 2)
+        cancellable.cancel()
+
+        XCTAssertEqual(representable?.averageTemp, "14.4 °C")
+        XCTAssertEqual(representable?.accumulatedRain, "45.6 mm")
+        XCTAssertEqual(representable?.missingDays, 1)
+    }
+
+    private func representable(currentWeather: DTO.CurrentWeather.Now?) -> HomeStation.Representable? {
+        let viewModel = HomeStationViewModel(
+            stationName: nil,
+            interactor: InteractorStub(.loaded(
+                dto: [.init(name: "Orís", key: "Temperatura mitjana", value: "17.0 °C", time: nil)],
+                stationCode: "CC", cityCode: "1", isHome: true, monthInfo: [], summary: .empty,
+                currentWeather: currentWeather
+            ))
+        )
+        let loaded = expectation(description: "loaded")
+        var result: HomeStation.Representable?
+        let cancellable = viewModel.$stateView.sink {
+            guard let value = $0.representable else { return }
+            result = value
+            loaded.fulfill()
+        }
+        wait(for: [loaded], timeout: 2)
+        cancellable.cancel()
+        return result
+    }
+
+    func testCurrentWeatherGivesTemperatureAndIcon() {
+        let icon = URL(string: "https://m.meteo.cat/icon.svg")
+        let now = DTO.CurrentWeather.Now(
+            currentTemp: "18", maxTemp: nil, minTemp: nil, weatherDescription: nil, iconWeather: icon
+        )
+        let result = representable(currentWeather: now)
+        XCTAssertEqual(result?.currentTemp, "18 °C")
+        XCTAssertEqual(result?.currentWeatherIcon, icon)
+    }
+
+    func testWithoutCurrentWeatherThereIsNoCurrentTemperature() {
+        XCTAssertNil(representable(currentWeather: nil)?.currentTemp)
+        XCTAssertNil(representable(currentWeather: nil)?.currentWeatherIcon)
+        let noTemp = DTO.CurrentWeather.Now(
+            currentTemp: " ", maxTemp: nil, minTemp: nil, weatherDescription: nil, iconWeather: nil
+        )
+        XCTAssertNil(representable(currentWeather: noTemp)?.currentTemp)
+    }
+
+    func testCurrentWeatherSurvivesNewMonthValues() {
+        let now = DTO.CurrentWeather.Now(
+            currentTemp: "18", maxTemp: nil, minTemp: nil, weatherDescription: nil, iconWeather: nil
+        )
+        let before = HomeStationStateDomain.loaded(
+            dto: [], stationCode: "CC", cityCode: "1", isHome: true, monthInfo: [], summary: .empty, currentWeather: now
+        )
+        XCTAssertEqual(before.withMonth([], summary: .empty).currentWeather, now)
+        XCTAssertEqual(before.copy(isFavorite: true).currentWeather, now)
+        XCTAssertEqual(before.withCurrentWeather(nil).currentWeather, nil)
+    }
+
+    func testNoDataIsItsOwnErrorNotANetworkFailure() {
+        XCTAssertEqual(HomeStation.ErrorView(stationInteractorError: .noData), .noData)
+        XCTAssertEqual(HomeStation.ErrorView(stationInteractorError: .noInternetConnection), .networkFailure)
+    }
+
+    func testNewMonthValuesKeepTheRestOfTheState() {
+        let before = HomeStationStateDomain.loaded(
+            dto: [.init(name: "Orís", key: "k", value: "v", time: nil, isFavorite: true)],
+            stationCode: "CC", cityCode: "1", isHome: true, monthInfo: [], summary: .empty
+        )
+        let summary = StationDayInfoSummary(averageTemp: 1, accumulatedRain: 2, daysWithData: 1, daysExpected: 1)
+        let after = before.withMonth([], summary: summary)
+
+        XCTAssertEqual(after.summuary, summary)
+        XCTAssertTrue(after.isFavorite)
+        XCTAssertTrue(after.isHome)
+        XCTAssertEqual(after.stationCode, "CC")
+        XCTAssertEqual(HomeStationStateDomain.loading.withMonth([], summary: summary), .loading)
+    }
+}

@@ -1,0 +1,44 @@
+# My Station header: "Temperatura actual" with the station's latest reading and the sky icon, no floating
+# "Current weather" button. Needs network (meteo.cat). Run against the booted Claude-Test simulator
+# (build with `xcodebuild build` first and `xcrun simctl install` it):
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/my_station_current_temp.yaml
+# The screenshot lands in <dir>/<timestamp>/my_station_current_temp/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+# A point right next to Orís (CC: 42.07397, 2.20865)
+- setLocation:
+    latitude: 42.0745
+    longitude: 2.2090
+
+# Clean install, no home station, location already allowed (no system prompt)
+- clearState
+- launchApp:
+    clearState: true
+    permissions:
+      location: inuse
+
+# Set Orís as My Station through the suggestion
+- tapOn: "My Station"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion.addButton"
+    timeout: 90000
+- tapOn:
+    id: "suggestion.addButton"
+- extendedWaitUntil:
+    visible:
+      id: "station.title"
+    timeout: 60000
+
+# The current weather arrives after the day
+- extendedWaitUntil:
+    visible:
+      id: "station.currentWeatherIcon"
+    timeout: 60000
+- assertVisible:
+    id: "station.hero"
+    text: ".*Temperatura actual.*"
+- assertVisible:
+    id: "station.currentWeatherIcon"
+- assertNotVisible: "Current weather"
+- takeScreenshot: my_station_current_temp

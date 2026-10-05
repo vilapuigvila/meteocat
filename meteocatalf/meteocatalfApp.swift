@@ -1,0 +1,110 @@
+//
+//  meteocatalfApp.swift
+//  meteocatalf
+//
+//  Created by albert vila on 31/10/24.
+//
+
+import SwiftUI
+import Alfy
+import SDWebImage
+import SDWebImageSVGCoder
+import FirebaseCore
+import FirebaseCrashlytics
+
+@main
+struct meteocatalfApp: App {
+    /*var sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            Model.Station.self
+        ])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()*/
+    
+    init() {
+        FirebaseApp.configure()
+        let svgCoder = SDImageSVGCoder.shared
+        SDImageCodersManager.shared.addCoder(svgCoder)
+    }
+    
+    var body: some Scene {
+        WindowGroup {
+            TabBarView()
+        }
+//        .modelContainer(sharedModelContainer)
+    }
+}
+
+// MARK: - move to Alfy -
+
+struct CrashlyticsManager {
+    static func reportNonFatal(error: CrashlyticsNonFatalError, domain: String) {
+        report(error, domain: domain)
+    }
+
+    static func report(_ error: CrashlyticsNonFatalError, domain: String) {
+        Crashlytics.crashlytics().record(error: error.asNSError(domain: domain))
+    }
+}
+
+enum CrashlyticsNonFatalError: Error {
+    case generic(_ message: String, _ file: String, _ line: UInt, _ code: UInt)
+
+    var userInfo: [String: Any] {
+        switch self {
+        case .generic(let message, let file, let line, let code):
+            return [
+                NSLocalizedDescriptionKey: message,
+                CrashlyticsNonFatalError.LocalizedFile: file,
+                CrashlyticsNonFatalError.LocalizedLine: Int(line),
+                CrashlyticsNonFatalError.LocalizedCode: Int(code)
+            ]
+        }
+    }
+    var code: UInt {
+        switch self {
+        case .generic(_, _, _, let code): return code
+        }
+    }
+
+    func asNSError(domain: String) -> NSError {
+        NSError(domain: domain, code: Int(code), userInfo: userInfo)
+    }
+}
+
+extension CrashlyticsNonFatalError {
+    private static let LocalizedFile = "file"
+    private static let LocalizedLine = "line"
+    private static let LocalizedCode = "code"
+}
+
+func nonFatalCrashlytics(_ condition: @autoclosure () -> Bool,
+                       _ message: @autoclosure () -> String,
+                       domain: CrashlyticsDomain = .meteocatalf,
+                       file: StaticString = #file,
+                       line: UInt = #line,
+                       code: UInt? = UInt(0)
+) {
+    guard !condition() else {
+        return
+    }
+    CrashlyticsManager.reportNonFatal(
+        error: .generic(message(),
+        "\(file)",
+        line, code ?? UInt(0)),
+        domain: domain.rawValue
+    )
+#if DEBUG
+    assert(condition(), message())
+#endif
+}
+enum CrashlyticsDomain: String {
+    case meteocatalf
+    case fetch_favorites
+}

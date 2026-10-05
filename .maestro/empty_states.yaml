@@ -1,0 +1,37 @@
+# Empty states (SignalEmptyState): Favs with no favourites, and the closest-station suggestion on My Station.
+# Needs network (meteo.cat). Run against the booted Claude-Test simulator
+# (build with `xcodebuild build` first and `xcrun simctl install` it):
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/empty_states.yaml
+# The screenshots land in <dir>/<timestamp>/empty_states/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+- setLocation:
+    latitude: 42.0745
+    longitude: 2.2090
+- clearState
+- launchApp:
+    clearState: true
+    permissions:
+      location: inuse
+
+# Favs: no favourite yet
+- tapOn: "Favs"
+- extendedWaitUntil:
+    visible:
+      id: "favorites.empty"
+    timeout: 30000
+- assertVisible: "No favourites yet"
+- takeScreenshot: empty_states_favs
+
+# My Station: the closest station, with the same component
+- tapOn: "My Station"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion.card"
+    timeout: 90000
+- assertVisible:
+    id: "suggestion.name"
+    text: "Orís"
+- assertVisible:
+    id: "suggestion.addButton"
+- takeScreenshot: empty_states_suggestion
