@@ -32,15 +32,19 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
     let databaseManager: DatabaseManagerProtocol
     /// Only the My Station tab suggests a station when it is empty.
     private let nearestStationSuggester: NearestStationSuggesting?
+    /// Only the My Station tab feeds the home-station widget.
+    private let widgetUpdater: HomeStationWidgetUpdating?
     
     init(
         source: Source,
         databaseManager: DatabaseManagerProtocol,
-        nearestStationSuggester: NearestStationSuggesting? = nil
+        nearestStationSuggester: NearestStationSuggesting? = nil,
+        widgetUpdater: HomeStationWidgetUpdating? = nil
     ) {
         self.source = source
         self.databaseManager = databaseManager
         self.nearestStationSuggester = nearestStationSuggester
+        self.widgetUpdater = widgetUpdater
     }
     
     private func cancel() {
@@ -81,6 +85,16 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 }
                 guard !Task.isCancelled else { return }
                 
+                if self.source == .homeStation {
+                    self.widgetUpdater?.dayLoaded(
+                        stationName: UserSettings.homeStation?.name ?? dto.first?.name ?? "",
+                        stationCode: stationCode,
+                        rows: dto.map { (key: $0.key, value: $0.value) },
+                        date: date,
+                        now: Date()
+                    )
+                }
+                
                 let referenceDate = Date()
                 let stored = StationWorker.cachedMonthInfoStation(
                     self.databaseManager,
@@ -119,6 +133,9 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         case .addAsHome(let stationName, let stationCode, let codeCity):
             if let stationCode, let stationName, let codeCity {
                 UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode, codeCity: codeCity)
+                if source == .homeStation {
+                    widgetUpdater?.homeStationChanged(stationName: stationName, stationCode: stationCode, now: Date())
+                }
                 if case .suggestion = domain, source == .homeStation {
                     // `homeStationPublisher` doesn't emit on set: the tab loads the new station itself
                     self.useCase(.requestStation(date: Date()))
@@ -126,6 +143,9 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 }
             } else {
                 UserSettings.homeStation = nil
+                if source == .homeStation {
+                    widgetUpdater?.clear()
+                }
             }
             let _domain = domain.copy(isHome: isHomeStation)
             subject.send(_domain)
@@ -140,6 +160,12 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         taskCurrentWeather = Task { @MainActor [weak self] in
             guard let weather: DTO.CurrentWeather = try? await ServerData.request(.curentWeather(code: cityCode)) else { return }
             guard let self, !Task.isCancelled, case .loaded = self.domain, self.domain.stationCode == stationCode else { return }
+            self.widgetUpdater?.currentWeatherLoaded(
+                stationName: UserSettings.homeStation?.name ?? "",
+                stationCode: stationCode,
+                rawTemp: weather.now.currentTemp,
+                now: Date()
+            )
             self.lastCurrentWeather = (stationCode, weather.now)
             self.subject.send(self.domain.withCurrentWeather(weather.now))
         }

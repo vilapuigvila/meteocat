@@ -19,10 +19,15 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
     }
 
     private let launchLocationPermission: LaunchLocationPermission?
+    private let widgetRefresher: HomeStationWidgetRefreshing?
 
-    /// `launchLocationPermission` is nil when the app must not ask (unit tests).
-    init(launchLocationPermission: LaunchLocationPermission? = nil) {
+    /// `launchLocationPermission` is nil when the app must not ask (unit tests); so is `widgetRefresher`.
+    init(
+        launchLocationPermission: LaunchLocationPermission? = nil,
+        widgetRefresher: HomeStationWidgetRefreshing? = nil
+    ) {
         self.launchLocationPermission = launchLocationPermission
+        self.widgetRefresher = widgetRefresher
     }
 
     private static var didPrefetchFavoritesMonthToDate = false
@@ -40,6 +45,12 @@ final class TabBarInteractorImpl: TabBarInteractorProtocol {
                 print("avpv - Prefetch completed in \(timeElapsed) seconds")
             }
         case .appDidBecomeActive:
+            // Before the permission guard: the widget is fed whether or not the app asks for location.
+            if let widgetRefresher {
+                Task { @MainActor in
+                    await widgetRefresher.refresh()
+                }
+            }
             guard let launchLocationPermission else { return }
             Task { @MainActor in
                 await launchLocationPermission.run()

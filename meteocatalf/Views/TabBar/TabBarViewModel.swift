@@ -33,6 +33,9 @@ final class TabBarViewModel: ObservableObject {
         // nor read the location.
         let isRunningUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
+        // Feeds the home-station widget from the My Station tab and on every activation.
+        let widgetUpdater: HomeStationWidgetUpdating? = isRunningUnitTests ? nil : HomeStationWidgetUpdater()
+
         let loadStations: () async -> [DTO.Station] = {
             // joins the launch request in flight; the coordinates come from the cached list (15 days)
             guard await stationsInteractor.ensureStationsAvailable() else { return [] }
@@ -57,7 +60,8 @@ final class TabBarViewModel: ObservableObject {
                 nearestStationSuggester: isRunningUnitTests ? nil : NearestStationSuggester(
                     location: CoreLocationOneShotReader(),
                     loadStations: loadStations
-                )
+                ),
+                widgetUpdater: widgetUpdater
             )
         )
         favsViewModel = FavoritesViewModel(
@@ -68,7 +72,10 @@ final class TabBarViewModel: ObservableObject {
             launchLocationPermission: isRunningUnitTests ? nil : LaunchLocationPermission(
                 ensureStations: { await stationsInteractor.ensureStationsAvailable() },
                 requester: CoreLocationPermissionRequester()
-            )
+            ),
+            widgetRefresher: widgetUpdater.map {
+                HomeStationWidgetRefresher(databaseManager: DatabaseManager.shared, updater: $0)
+            }
         )
 
         interactor.useCase(.appDidStart)
