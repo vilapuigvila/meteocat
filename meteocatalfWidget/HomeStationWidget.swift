@@ -56,7 +56,7 @@ struct HomeStationWidget: Widget {
         }
         .configurationDisplayName("My Station")
         .description("Current temperature and today's max and min of your station.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline, .accessoryCircular])
     }
 }
 
@@ -79,11 +79,18 @@ struct HomeStationWidgetView: View {
             switch family {
             case .accessoryRectangular:
                 AccessoryRectangularView(display: display)
+            case .accessoryInline:
+                AccessoryInlineView(display: display)
+            case .accessoryCircular:
+                AccessoryCircularView(display: display)
             case .systemMedium:
                 MediumView(display: display)
             default:
                 SmallView(display: display)
             }
+        } else if family == .accessoryInline || family == .accessoryCircular {
+            // No room for the sentence: a hint that the station is missing.
+            Text(HomeStationWidgetDisplay.placeholderValue)
         } else {
             EmptyStationView()
         }
@@ -177,6 +184,48 @@ private struct AccessoryRectangularView: View {
     }
 }
 
+/// The line above the clock on the Lock Screen: "18° ↑21° ↓12°". One `Text`, the only thing iOS draws there.
+private struct AccessoryInlineView: View {
+    let display: HomeStationWidgetDisplay
+
+    var body: some View {
+        Text("\(ShortTemp.text(display.currentTemp)) ↑\(ShortTemp.text(display.maxTemp)) ↓\(ShortTemp.text(display.minTemp))")
+    }
+}
+
+/// The round Lock Screen widget: current temperature large, max and min below it.
+private struct AccessoryCircularView: View {
+    let display: HomeStationWidgetDisplay
+
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            VStack(spacing: 0) {
+                Text(ShortTemp.text(display.currentTemp))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .minimumScaleFactor(0.6)
+                Text("\(ShortTemp.text(display.maxTemp)) \(ShortTemp.text(display.minTemp))")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .minimumScaleFactor(0.6)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 4)
+        }
+    }
+}
+
+/// "21.3 °C" → "21°", for the Lock Screen sizes where "°C" and decimals don't fit. "--" stays as it is.
+private enum ShortTemp {
+    static func text(_ value: String) -> String {
+        let number = value
+            .replacingOccurrences(of: "°C", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        guard let double = Double(number) else { return value }
+        return "\(Int(double.rounded()))°"
+    }
+}
+
 /// Shown when no home station has been chosen in the app.
 private struct EmptyStationView: View {
     var body: some View {
@@ -193,6 +242,18 @@ private struct EmptyStationView: View {
 }
 
 // MARK: - Preview
+
+#Preview(as: .accessoryCircular) {
+    HomeStationWidget()
+} timeline: {
+    HomeStationEntry(date: Date(), display: HomeStationWidgetDisplay.preview)
+}
+
+#Preview(as: .accessoryInline) {
+    HomeStationWidget()
+} timeline: {
+    HomeStationEntry(date: Date(), display: HomeStationWidgetDisplay.preview)
+}
 
 #Preview(as: .systemSmall) {
     HomeStationWidget()
