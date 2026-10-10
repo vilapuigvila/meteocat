@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Alfy
 
 /// Feeds the home-station widget from the app's own data.
 @MainActor
