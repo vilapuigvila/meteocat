@@ -35,6 +35,7 @@ final class HomeStationWidgetTests: XCTestCase {
 
     private func snapshot(
         code: String = "CC",
+        cityCode: String? = nil,
         currentTemp: String? = nil,
         currentTempAt: Date? = nil,
         maxTemp: String? = nil,
@@ -45,6 +46,7 @@ final class HomeStationWidgetTests: XCTestCase {
         return HomeStationWidgetSnapshot(
             stationName: "Orís",
             stationCode: code,
+            cityCode: cityCode,
             currentTemp: currentTemp,
             currentTempAt: currentTempAt,
             maxTemp: maxTemp,
@@ -75,7 +77,7 @@ final class HomeStationWidgetTests: XCTestCase {
         let store = HomeStationWidgetStore(defaults: defaults)
         let now = date(2026, 10, 9, 10, 30, in: madrid)
         let saved = snapshot(
-            currentTemp: "18 °C", currentTempAt: now, maxTemp: "21.3 °C", minTemp: "12.4 °C",
+            cityCode: "080193", currentTemp: "18 °C", currentTempAt: now, maxTemp: "21.3 °C", minTemp: "12.4 °C",
             extremesDay: 20261009, updatedAt: now
         )
         store.save(saved)
@@ -92,6 +94,16 @@ final class HomeStationWidgetTests: XCTestCase {
     func testUndecodableDataLoadsAsNil() {
         defaults.set(Data("not a snapshot".utf8), forKey: HomeStationWidgetStore.key)
         XCTAssertNil(HomeStationWidgetStore(defaults: defaults).load())
+    }
+
+    func testSnapshotStoredBeforeTheCityCodeExistedStillLoads() {
+        // Written by an older build: no cityCode key.
+        let old = Data(#"{"stationName":"Orís","stationCode":"CC","updatedAt":0}"#.utf8)
+        defaults.set(old, forKey: HomeStationWidgetStore.key)
+
+        let loaded = HomeStationWidgetStore(defaults: defaults).load()
+        XCTAssertEqual(loaded?.stationCode, "CC")
+        XCTAssertNil(loaded?.cityCode)
     }
 
     func testStoreWithoutDefaultsDoesNothing() {
@@ -308,14 +320,45 @@ final class HomeStationWidgetTests: XCTestCase {
         let widget = makeUpdater(counter)
         let now = date(2026, 10, 9, 12, in: madrid)
 
+        widget.homeStationChanged(stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now)
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
-        widget.homeStationChanged(stationName: "Orís", stationCode: "CC", now: now.addingTimeInterval(60))
+        let before = store.load()
+        widget.homeStationChanged(
+            stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now.addingTimeInterval(60)
+        )
 
         let saved = store.load()
+        XCTAssertEqual(saved, before)
         XCTAssertEqual(saved?.stationCode, "CC")
+        XCTAssertEqual(saved?.cityCode, "080193")
         XCTAssertEqual(saved?.maxTemp, "21.3 °C")
         XCTAssertEqual(saved?.minTemp, "12.4 °C")
         XCTAssertEqual(saved?.extremesDay, 20261009)
+    }
+
+    func testSameHomeStationWithANewCityCodeKeepsTheValues() {
+        let counter = ReloadCounter()
+        let store = HomeStationWidgetStore(defaults: defaults)
+        let widget = makeUpdater(counter)
+        let now = date(2026, 10, 9, 12, in: madrid)
+
+        widget.homeStationChanged(stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now)
+        widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now)
+        XCTAssertEqual(counter.count, 3)
+
+        widget.homeStationChanged(
+            stationName: "Orís", stationCode: "CC", cityCode: "080194", now: now.addingTimeInterval(60)
+        )
+
+        let saved = store.load()
+        XCTAssertEqual(saved?.stationCode, "CC")
+        XCTAssertEqual(saved?.cityCode, "080194")
+        XCTAssertEqual(saved?.currentTemp, "18 °C")
+        XCTAssertEqual(saved?.maxTemp, "21.3 °C")
+        XCTAssertEqual(saved?.minTemp, "12.4 °C")
+        XCTAssertEqual(saved?.extremesDay, 20261009)
+        XCTAssertEqual(counter.count, 4)
     }
 
     func testAnotherHomeStationEmptiesTheValues() {
@@ -326,11 +369,12 @@ final class HomeStationWidgetTests: XCTestCase {
 
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
         widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now)
-        widget.homeStationChanged(stationName: "Sant Cugat", stationCode: "XX", now: now)
+        widget.homeStationChanged(stationName: "Sant Cugat", stationCode: "XX", cityCode: "080999", now: now)
 
         let saved = store.load()
         XCTAssertEqual(saved?.stationName, "Sant Cugat")
         XCTAssertEqual(saved?.stationCode, "XX")
+        XCTAssertEqual(saved?.cityCode, "080999")
         XCTAssertNil(saved?.currentTemp)
         XCTAssertNil(saved?.maxTemp)
         XCTAssertNil(saved?.minTemp)
@@ -338,16 +382,47 @@ final class HomeStationWidgetTests: XCTestCase {
         XCTAssertEqual(counter.count, 3)
     }
 
+    func testCityCodeSurvivesDayAndWeatherUpdates() {
+        let counter = ReloadCounter()
+        let store = HomeStationWidgetStore(defaults: defaults)
+        let widget = makeUpdater(counter)
+        let now = date(2026, 10, 9, 12, in: madrid)
+
+        widget.homeStationChanged(stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now)
+        widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
+        XCTAssertEqual(store.load()?.cityCode, "080193")
+
+        widget.currentWeatherLoaded(
+            stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now.addingTimeInterval(600)
+        )
+        XCTAssertEqual(store.load()?.cityCode, "080193")
+    }
+
+    func testValuesLoadedWithoutAHomeStationHaveNoCityCode() {
+        let store = HomeStationWidgetStore(defaults: defaults)
+        let now = date(2026, 10, 9, 12, in: madrid)
+
+        makeUpdater(ReloadCounter()).dayLoaded(
+            stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now
+        )
+
+        XCTAssertEqual(store.load()?.stationCode, "CC")
+        XCTAssertNil(store.load()?.cityCode)
+    }
+
     func testHomeStationChangedWithNothingStoredSavesAnEmptySnapshot() {
         let counter = ReloadCounter()
         let store = HomeStationWidgetStore(defaults: defaults)
         let now = date(2026, 10, 9, 12, in: madrid)
 
-        makeUpdater(counter).homeStationChanged(stationName: "Orís", stationCode: "CC", now: now)
+        makeUpdater(counter).homeStationChanged(
+            stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now
+        )
 
         let saved = store.load()
         XCTAssertEqual(saved?.stationCode, "CC")
         XCTAssertEqual(saved?.stationName, "Orís")
+        XCTAssertEqual(saved?.cityCode, "080193")
         XCTAssertNil(saved?.maxTemp)
         XCTAssertNil(saved?.minTemp)
         XCTAssertEqual(saved?.updatedAt, now)

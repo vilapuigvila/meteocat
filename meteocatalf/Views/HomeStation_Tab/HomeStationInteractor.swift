@@ -134,7 +134,7 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
             if let stationCode, let stationName, let codeCity {
                 UserSettings.homeStation = PREF.HomeStation(name: stationName, code: stationCode, codeCity: codeCity)
                 if source == .homeStation {
-                    widgetUpdater?.homeStationChanged(stationName: stationName, stationCode: stationCode, now: Date())
+                    widgetUpdater?.homeStationChanged(stationName: stationName, stationCode: stationCode, cityCode: codeCity, now: Date())
                 }
                 if case .suggestion = domain, source == .homeStation {
                     // `homeStationPublisher` doesn't emit on set: the tab loads the new station itself

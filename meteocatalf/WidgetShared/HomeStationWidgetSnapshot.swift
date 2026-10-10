@@ -9,6 +9,8 @@ import Foundation
 struct HomeStationWidgetSnapshot: Codable, Equatable, Sendable {
     let stationName: String
     let stationCode: String
+    /// Municipality code of the station, for the current-weather page. nil in snapshots written before it was stored.
+    var cityCode: String?
     /// "18 °C", nil until a reading arrived.
     var currentTemp: String?
     var currentTempAt: Date?

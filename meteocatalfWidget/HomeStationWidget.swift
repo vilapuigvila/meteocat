@@ -11,7 +11,9 @@ struct HomeStationEntry: TimelineEntry {
 
 // MARK: - Provider
 
-/// Reads the snapshot the app writes to the App Group. No networking here.
+/// Reads the snapshot the app writes to the App Group. Only `getTimeline` touches the network: it refreshes the
+/// snapshot from meteo.cat first (`HomeStationWidgetSelfRefresh`, skipped while the snapshot is fresh), then reads it.
+/// `placeholder` and `getSnapshot` never do.
 struct HomeStationProvider: TimelineProvider {
     /// How often the widget re-reads the shared snapshot.
     private static let refreshInterval: TimeInterval = 30 * 60
@@ -29,12 +31,15 @@ struct HomeStationProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<HomeStationEntry>) -> Void) {
-        let now = Date()
-        let timeline = Timeline(
-            entries: [currentEntry(now: now)],
-            policy: .after(now.addingTimeInterval(Self.refreshInterval))
-        )
-        completion(timeline)
+        Task {
+            let now = Date()
+            await HomeStationWidgetSelfRefresh().refreshIfNeeded(now: now)
+            let timeline = Timeline(
+                entries: [currentEntry(now: Date())],
+                policy: .after(now.addingTimeInterval(Self.refreshInterval))
+            )
+            completion(timeline)
+        }
     }
 
     // MARK: - Helpers

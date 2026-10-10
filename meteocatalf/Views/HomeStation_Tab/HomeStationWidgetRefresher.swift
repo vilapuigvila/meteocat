@@ -24,7 +24,7 @@ struct HomeStationWidgetRefresher: HomeStationWidgetRefreshing {
             return
         }
         let now = Date()
-        updater.homeStationChanged(stationName: home.name, stationCode: home.code, now: now)
+        updater.homeStationChanged(stationName: home.name, stationCode: home.code, cityCode: home.codeCity, now: now)
 
         // A day that can't be loaded yet (first hours after midnight) or a failed request leaves the snapshot as it is.
         if let rows = try? await todayRows(code: home.code, date: now) {

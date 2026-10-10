@@ -12,7 +12,8 @@ protocol HomeStationWidgetUpdating {
     func dayLoaded(stationName: String, stationCode: String, rows: [(key: String, value: String)], date: Date, now: Date)
     func currentWeatherLoaded(stationName: String, stationCode: String, rawTemp: String?, now: Date)
     /// The home station changed: values of the previous one must not be shown under the new name.
-    func homeStationChanged(stationName: String, stationCode: String, now: Date)
+    /// Same station with another city code: the values are kept and only the city code changes.
+    func homeStationChanged(stationName: String, stationCode: String, cityCode: String, now: Date)
     func clear()
 }
 
@@ -50,10 +51,17 @@ struct HomeStationWidgetUpdater: HomeStationWidgetUpdating {
         save(snapshot)
     }
 
-    func homeStationChanged(stationName: String, stationCode: String, now: Date) {
-        // Same station: keep what is shown. Nothing stored yet, or another station: start empty.
-        guard store.load()?.stationCode != stationCode else { return }
-        save(HomeStationWidgetSnapshot(stationName: stationName, stationCode: stationCode, updatedAt: now))
+    func homeStationChanged(stationName: String, stationCode: String, cityCode: String, now: Date) {
+        // Nothing stored yet, or another station: start empty.
+        guard let stored = store.load(), stored.stationCode == stationCode else {
+            save(HomeStationWidgetSnapshot(stationName: stationName, stationCode: stationCode, cityCode: cityCode, updatedAt: now))
+            return
+        }
+        // Same station: keep what is shown, only the city code can be new.
+        guard stored.cityCode != cityCode else { return }
+        var snapshot = stored
+        snapshot.cityCode = cityCode
+        save(snapshot)
     }
 
     func clear() {
@@ -71,6 +79,7 @@ struct HomeStationWidgetUpdater: HomeStationWidgetUpdating {
         return HomeStationWidgetSnapshot(
             stationName: stationName,
             stationCode: stationCode,
+            cityCode: stored.cityCode,
             currentTemp: stored.currentTemp,
             currentTempAt: stored.currentTempAt,
             maxTemp: stored.maxTemp,

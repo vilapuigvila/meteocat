@@ -17,6 +17,7 @@
 		50EF9FC22CD3846D0066CAAE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC12CD3846D0066CAAE /* Assets.xcassets */; };
 		50EF9FC52CD3846D0066CAAE /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50EF9FC42CD3846D0066CAAE /* Preview Assets.xcassets */; };
 			7A3D100A2E9A000100C0FFEE /* meteocatalfWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A3D10022E9A000100C0FFEE /* meteocatalfWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A3D10122E9A000100C0FFEE /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 7A3D10112E9A000100C0FFEE /* SwiftSoup */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -124,6 +125,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A3D10122E9A000100C0FFEE /* SwiftSoup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,6 +274,7 @@
 			);
 			name = meteocatalfWidget;
 			packageProductDependencies = (
+				7A3D10112E9A000100C0FFEE /* SwiftSoup */,
 			);
 			productName = meteocatalfWidget;
 			productReference = 7A3D10022E9A000100C0FFEE /* meteocatalfWidget.appex */;
@@ -307,6 +310,7 @@
 			packageReferences = (
 				504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */,
 				5021854D2E85859000E6F003 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				7A3D10102E9A000100C0FFEE /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 			);
 			productRefGroup = 50EF9FB92CD3846B0066CAAE /* Products */;
 			projectDirPath = "";
@@ -759,6 +763,14 @@
 				kind = branch;
 			};
 		};
+		7A3D10102E9A000100C0FFEE /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.13.9;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -781,6 +793,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 504ECD3B2DE84CA100C95D80 /* XCRemoteSwiftPackageReference "Alfy" */;
 			productName = Alfy;
+		};
+		7A3D10112E9A000100C0FFEE /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A3D10102E9A000100C0FFEE /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
