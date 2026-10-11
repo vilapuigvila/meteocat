@@ -29,6 +29,7 @@ extension StationsList {
         @State private var selectedStation: DTO.Station?
         @State private var isPresentedDetail = false
         @State private var searchText = ""
+        @FocusState private var isSearchFocused: Bool
 //        @State private var path: [] = []
 
 // "avp check it out ⚠️ -> .navigationTitle(Estacions) comes from top after pull to refresh"
@@ -81,6 +82,7 @@ extension StationsList {
             }
             .onDisappear {
 //                selectedStation = nil
+                isSearchFocused = false
                 viewModel.action(.onDisappear)
             }
         }
@@ -113,6 +115,7 @@ extension StationsList {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Signal.muted)
                 TextField("Search stations", text: $searchText)
+                    .focused($isSearchFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -197,6 +200,7 @@ extension StationsList {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
 
         private func open(_ station: DTO.Station) {
