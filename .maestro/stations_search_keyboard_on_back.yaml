@@ -1,0 +1,48 @@
+# Search field focus: focus the search field, open a station, come back. The keyboard must not
+# pop back up (NavigationStack silently restores first-responder to the search field on pop
+# otherwise — see StationsList.MainView.swift, onSelectStation/open(_:)). SwiftUI's FocusState
+# doesn't reliably surface through the accessibility "focused" attribute on this field, so the
+# keyboard itself is asserted directly, via its container's stable system id.
+# Needs network (meteo.cat). Run against the booted Claude-Test simulator
+# (build with `xcodebuild build` first and `xcrun simctl install` it):
+#   maestro --device 942A8639-020A-4121-B65C-C85BFDABD70D test --test-output-dir <dir> .maestro/stations_search_keyboard_on_back.yaml
+# The screenshot lands in <dir>/<timestamp>/stations_search_keyboard_on_back/takeScreenshot/.
+appId: com.pskmoons.meteocat
+---
+- clearState
+- launchApp
+
+# Stations tab: focus the search field and filter to Orís
+- tapOn: "Stations"
+- extendedWaitUntil:
+    visible:
+      id: "stations.search"
+    timeout: 60000
+- tapOn:
+    id: "stations.search"
+- inputText: "Orís"
+- extendedWaitUntil:
+    visible:
+      id: "stations.row.CC"
+    timeout: 30000
+- assertVisible:
+    id: "UIKeyboardLayoutStar Preview"
+
+# Open the station, then come back with the system back button
+- tapOn:
+    id: "stations.row.CC"
+- extendedWaitUntil:
+    visible:
+      id: "station.title"
+    timeout: 60000
+- tapOn:
+    id: "BackButton"
+
+# Back on the list: the keyboard must not be showing
+- extendedWaitUntil:
+    visible:
+      id: "stations.search"
+    timeout: 30000
+- assertNotVisible:
+    id: "UIKeyboardLayoutStar Preview"
+- takeScreenshot: stations_search_keyboard_on_back

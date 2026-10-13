@@ -51,7 +51,10 @@ extension StationsList {
                                     stations: filteredStations,
                                     nearest: isSearching ? nil : viewModel.nearest,
                                     selectedStation: $selectedStation,
-                                    isPresentedDetail: $isPresentedDetail
+                                    isPresentedDetail: $isPresentedDetail,
+                                    onSelectStation: {
+                                        isSearchFocused = false
+                                    }
                                 )
                                 .refreshable {
                                     viewModel.action(.pullToRefresh)
@@ -59,6 +62,13 @@ extension StationsList {
                             }
                         }
                     }
+                }
+                .onDisappear {
+                    isSearchFocused = false
+                    viewModel.action(.onDisappear)
+                }
+                .onAppear {
+                    isSearchFocused = false
                 }
                 .background(Signal.paper.ignoresSafeArea())
                 .navigationTitle("Estacions")
@@ -81,7 +91,6 @@ extension StationsList {
                 viewModel.action(.onAppear)
             }
             .onDisappear {
-//                selectedStation = nil
                 isSearchFocused = false
                 viewModel.action(.onDisappear)
             }
@@ -168,17 +177,20 @@ extension StationsList {
         
         @Binding var selectedStation: DTO.Station?
         @Binding var isPresentedDetail: Bool
-        
+        let onSelectStation: () -> Void
+
         init(
             stations: [DTO.Station],
             nearest: NearestStation.Suggestion? = nil,
             selectedStation: Binding<DTO.Station?>,
-            isPresentedDetail: Binding<Bool>
+            isPresentedDetail: Binding<Bool>,
+            onSelectStation: @escaping () -> Void = {}
         ) {
             self.stations = stations
             self.nearest = nearest
             _selectedStation = selectedStation
             _isPresentedDetail = isPresentedDetail
+            self.onSelectStation = onSelectStation
         }
         
         var body: some View {
@@ -204,6 +216,7 @@ extension StationsList {
         }
 
         private func open(_ station: DTO.Station) {
+            onSelectStation()
             selectedStation = station
             isPresentedDetail = true
         }
