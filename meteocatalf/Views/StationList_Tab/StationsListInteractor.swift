@@ -75,7 +75,17 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         if let task = requestStationsTask {
             return await task.value
         }
-        if let storedStations = await fetchStationsFromDatabase(), !pullToRefresh {
+
+        // Rate-limit pull-to-refresh: only force a network refresh once per 24 hours
+        var effectivePullToRefresh = pullToRefresh
+        if pullToRefresh, let lastRequestTime = UserSettings.lastListStationsRequest {
+            let lastRequestDate = Date(timeIntervalSince1970: lastRequestTime)
+            if lastRequestDate.differenceInHoursFromNow < 24 {
+                effectivePullToRefresh = false
+            }
+        }
+
+        if let storedStations = await fetchStationsFromDatabase(), !effectivePullToRefresh {
             subject.send(
                 StationsListDomain(
                     list: storedStations.map {
@@ -90,7 +100,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
         if let task = requestStationsTask {
             return await task.value
         }
-        return await fetchAndStoreStations(forceRefresh: pullToRefresh).value
+        return await fetchAndStoreStations(forceRefresh: effectivePullToRefresh).value
     }
     
     /// Retrieves stored stations if they are not outdated
@@ -119,7 +129,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
     /// `forceRefresh` makes the request skip Alfy's cache, which also holds the list for 15 days.
     private func fetchAndStoreStations(forceRefresh: Bool) -> Task<Bool, Never> {
         subject.send(.init(list: [], isLoading: true))
-        
+
         let task = Task { [weak self] () -> Bool in
             var didLoad = false
             do {
@@ -128,18 +138,21 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
                     $0.name.compare($1.name, locale: Locale(identifier: "ca")) == .orderedAscending
                 }
                 self?.subject.send(StationsListDomain(list: sortedStations, isLoading: false))
-                
+
                 guard !result.isEmpty else {
                     return false
                 }
                 didLoad = true
+                let fetchTime = Date().timeIntervalSince1970
                 print("avpv 🛜 - stations from api")
-                
+
                 guard let self = self else {
                     nonFatalCrashlytics(false, "dataCorrupted")
                     return didLoad
                 }
-                try await self.refreshStationInDatabase(sortedStations, timeInterval: Date().timeIntervalSince1970)
+                try await self.refreshStationInDatabase(sortedStations, timeInterval: fetchTime)
+                // Record the successful fetch time for pull-to-refresh rate limiting
+                UserSettings.lastListStationsRequest = fetchTime
             } catch {
                 nonFatalCrashlytics(false, error.localizedDescription)
             }
