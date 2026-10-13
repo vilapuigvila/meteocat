@@ -15,6 +15,7 @@ struct FavoritesDomain {
         let minTemp: String
         let rainAcc: String
         let code: String
+        let cityCode: String
         let isFavorite: Bool
     }
     static let empty: FavoritesDomain = .init(list: [], isLoading: false, error: nil)

@@ -30,6 +30,7 @@ enum Favorites: Hashable, Sendable {
         let minTemp: String
         let rainAcc: String
         let stationCode: String
+        let cityCode: String
         let isFAvorite: Bool
     }
 }

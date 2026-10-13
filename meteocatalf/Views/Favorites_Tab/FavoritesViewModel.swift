@@ -50,6 +50,7 @@ final class FavoritesViewModel: ObservableObject {
                                     minTemp: $0.minTemp,
                                     rainAcc: $0.rainAcc,
                                     stationCode: $0.code,
+                                    cityCode: $0.cityCode,
                                     isFAvorite: $0.isFavorite
                                 )
                         }

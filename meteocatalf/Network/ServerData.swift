@@ -54,8 +54,8 @@ struct ServerData {
     enum CacheTTL {
         /// `StationsListInteractorImpl` reuses the stored station list for 15 days.
         static let stations: TimeInterval = 60 * 60 * 24 * 15
-        /// `Forecast.MainView` asks again after 5 minutes.
-        static let currentWeather: TimeInterval = 60 * 5
+        /// `Forecast.MainView` asks again after 30 minutes.
+        static let currentWeather: TimeInterval = 60 * 30
         /// XEMA readings are half-hourly. No caller yet, so no database rule to mirror.
         static let lastTemperature: TimeInterval = 60 * 30
         /// RainViewer adds a radar image every 10 minutes.

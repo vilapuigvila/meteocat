@@ -64,15 +64,15 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
                 sortBy: nil
             )
             let favs = stations.map {
-                DTO.Station(code: $0.code, name: $0.name, type: $0.type, isFavorite: $0.isFavorite)
+                DTO.Station(code: $0.code, name: $0.name, type: $0.type, codeCity: $0.codeCity, isFavorite: $0.isFavorite)
             }
             requestStationsTask = Task {
-                
+
                 do {
                     let result: [Fav] = try await withThrowingTaskGroup(of: Fav?.self) { group in
                         for fav in favs {
                             group.addTask {
-                                try await self.requestInfoStation(code: fav.code, date: Date())
+                                try await self.requestInfoStation(code: fav.code, cityCode: fav.city.codi, date: Date())
                             }
                         }
                         var favsResult = [Fav]()
@@ -118,15 +118,15 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
     }
     
     /// Returns the station values for a specific date, using cached DB data when possible.
-    private func requestInfoStation(code: String, date: Date) async throws -> Fav? {
+    private func requestInfoStation(code: String, cityCode: String, date: Date) async throws -> Fav? {
         if let dto = await MainActor.run(body: {
             StationWorker.fetchInfoStation(databaseManager, code: code, date: date)
         }) {
-            return Self.mapStationInfo(dto, code: code)
+            return Self.mapStationInfo(dto, code: code, cityCode: cityCode)
         }
         do {
             let dto = try await StationWorker.requestInfoStation(databaseManager, code: code, date: date, store: true)
-            return Self.mapStationInfo(dto, code: code)
+            return Self.mapStationInfo(dto, code: code, cityCode: cityCode)
         } catch {
             if error is StationWorker.ErrorReason || error is CancellationError {
                 return nil
@@ -177,7 +177,7 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
         }
     }
     
-    private static func mapStationInfo(_ dto: [DTO.HomeStation], code: String) -> Fav {
+    private static func mapStationInfo(_ dto: [DTO.HomeStation], code: String, cityCode: String) -> Fav {
         let maxTemp: String = {
             guard let max = dto.first(where: { Self.normalized($0.key).contains("temperatura maxima") }) else {
                 nonFatalCrashlytics(false, "dataCorrupted")
@@ -204,6 +204,7 @@ final class FavoritesInteractorImpl: FavoritesInteractorProtocol {
             minTemp: minTemp,
             rainAcc: rain,
             code: code,
+            cityCode: cityCode,
             isFavorite: true
         )
     }

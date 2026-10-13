@@ -89,7 +89,7 @@ final class StationsListInteractorImpl: StationsListInteractorProtocol {
             subject.send(
                 StationsListDomain(
                     list: storedStations.map {
-                        DTO.Station(code: $0.code, name: $0.name, type: $0.type, isFavorite: $0.isFavorite)
+                        DTO.Station(code: $0.code, name: $0.name, type: $0.type, codeCity: $0.codeCity, isFavorite: $0.isFavorite)
                     },
                     isLoading: false)
             )

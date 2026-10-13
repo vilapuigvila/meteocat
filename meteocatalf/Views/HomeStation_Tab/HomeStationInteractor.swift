@@ -158,8 +158,21 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         guard source == .homeStation else { return }
         taskCurrentWeather?.cancel()
         taskCurrentWeather = Task { @MainActor [weak self] in
+            guard let self else { return }
+            var cityCode = cityCode
+            if cityCode.isEmpty {
+                // `UserSettings.homeStation.codeCity` could have been stored empty by an older bug
+                // (home station set from a station opened via Favorites, or from a DB-cached list,
+                // before DTO.Station carried a real city code). Recover it from the stations table,
+                // which always has the real value, and repair the stored home station while we're at it.
+                guard let repaired = self.repairHomeStationCityCode(stationCode: stationCode) else {
+                    nonFatalCrashlytics(false, "missing codeCity for home station \(stationCode)")
+                    return
+                }
+                cityCode = repaired
+            }
             guard let weather: DTO.CurrentWeather = try? await ServerData.request(.curentWeather(code: cityCode)) else { return }
-            guard let self, !Task.isCancelled, case .loaded = self.domain, self.domain.stationCode == stationCode else { return }
+            guard !Task.isCancelled, case .loaded = self.domain, self.domain.stationCode == stationCode else { return }
             self.widgetUpdater?.currentWeatherLoaded(
                 stationName: UserSettings.homeStation?.name ?? "",
                 stationCode: stationCode,
@@ -242,6 +255,23 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
         case .detailStation(let code, let cityCode):
             return (code, cityCode)
         }
+    }
+
+    /// Looks up `stationCode`'s real city code in the stations table and, if the stored home
+    /// station still matches, repairs its persisted `codeCity` so this doesn't need to run again.
+    @MainActor
+    private func repairHomeStationCityCode(stationCode: String) -> String? {
+        guard let stored = try? databaseManager.fetchItems(
+            Model.Station.self,
+            predicate: #Predicate<Model.Station> { $0.code == stationCode },
+            sortBy: nil
+        ).first, !stored.codeCity.isEmpty else {
+            return nil
+        }
+        if let home = UserSettings.homeStation, home.code == stationCode {
+            UserSettings.homeStation = PREF.HomeStation(name: home.name, code: home.code, codeCity: stored.codeCity)
+        }
+        return stored.codeCity
     }
 
     private var isHomeStation: Bool {

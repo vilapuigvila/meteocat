@@ -27,6 +27,7 @@ extension DTO {
             code: String,
             name: String,
             type: String,
+            codeCity: String = "",
             isFavorite: Bool = false
         ) {
             self.code = code
@@ -35,7 +36,7 @@ extension DTO {
             self.coordinates = .init(latitude: 0, longitude: 0)
             self.emplacament = ""
             self.altitude = 0
-            self.city = City(codi: "", nom: "", slug: "", coordenades: Coordinates(latitude: 0, longitude: 0), comarca: "")
+            self.city = City(codi: codeCity, nom: "", slug: "", coordenades: Coordinates(latitude: 0, longitude: 0), comarca: "")
             self.region = Region(codi: 0, nom: "")
             self.states = []
             self.isFavorite = isFavorite
@@ -56,7 +57,7 @@ extension DTO {
         }
         
         func copy(isFavorite: Bool) -> Self {
-            Station(code: code, name: name, type: type, isFavorite: isFavorite)
+            Station(code: code, name: name, type: type, codeCity: city.codi, isFavorite: isFavorite)
         }
         
         enum CodingKeys: String, CodingKey {

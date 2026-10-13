@@ -92,7 +92,7 @@ extension Favorites {
                                 let viewModel = HomeStationViewModel(
                                     stationName: selectedItem.name,
                                     interactor: HomeStationInteractorImpl(
-                                        source: .detailStation(code: selectedItem.stationCode, cityCode: ""),
+                                        source: .detailStation(code: selectedItem.stationCode, cityCode: selectedItem.cityCode),
                                         databaseManager: DatabaseManager.shared
                                     )
                                 )
@@ -158,14 +158,14 @@ extension Favorites {
 #Preview {
      var mockviewModel: Favorites.ViewState {
         .loaded([
-            Favorites.Representable(name: "Castellar de N'Hug", maxTemp: "19.1 C", minTemp: "10.12121321 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "St. Llorenç de Morunys", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Vallter 2000", maxTemp: "23.1324353453435454 C", minTemp: "21.1123454545 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Vic", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Barcelona", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Banyoles", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Cadaqués", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", isFAvorite: false),
-            Favorites.Representable(name: "Olot", maxTemp: "19.145644564446 C", minTemp: "10.1 C", rainAcc: "--", stationCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Castellar de N'Hug", maxTemp: "19.1 C", minTemp: "10.12121321 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "St. Llorenç de Morunys", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Vallter 2000", maxTemp: "23.1324353453435454 C", minTemp: "21.1123454545 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Vic", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Barcelona", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Banyoles", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Cadaqués", maxTemp: "19.1 C", minTemp: "10.1 C", rainAcc: "12 mm", stationCode: "", cityCode: "", isFAvorite: false),
+            Favorites.Representable(name: "Olot", maxTemp: "19.145644564446 C", minTemp: "10.1 C", rainAcc: "--", stationCode: "", cityCode: "", isFAvorite: false),
         ])
     }
     return Favorites.MainView(state: mockviewModel) { _ in
