@@ -36,6 +36,8 @@ struct HomeStationWidgetRefresher: HomeStationWidgetRefreshing {
                 stationName: home.name,
                 stationCode: home.code,
                 rawTemp: weather.now.currentTemp,
+                weatherDescription: weather.now.weatherDescription,
+                weatherIconCode: HomeStationWidgetValues.iconCode(from: weather.now.iconWeather),
                 now: Date()
             )
         }

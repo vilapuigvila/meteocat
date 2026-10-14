@@ -48,7 +48,9 @@ final class HomeStationWidgetFetcherTests: XCTestCase {
         """
 
         static let current = """
-        <html><body><div class="temp"> 18 <abbr>°C</abbr></div></body></html>
+        <html><body><div class="temp"> 18 <abbr>°C</abbr></div>
+        <div class="meteor"><img src="https://static-m.meteo.cat/assets/images/meteors/estatcel/8.svg" alt=""></div>
+        <div class="descripcio">Tempesta</div></body></html>
         """
     }
 
@@ -126,6 +128,24 @@ final class HomeStationWidgetFetcherTests: XCTestCase {
         XCTAssertNil(HomeStationWidgetFetcher.parseCurrentTemp(html: "<div class=\"temp\"><abbr>°C</abbr></div>"))
     }
 
+    func testWeatherDescriptionIsTheTextOfTheDescriptionDiv() {
+        XCTAssertEqual(HomeStationWidgetFetcher.parseWeatherDescription(html: Page.current), "Tempesta")
+    }
+
+    func testWeatherDescriptionIsNilWhenMissingOrBlank() {
+        XCTAssertNil(HomeStationWidgetFetcher.parseWeatherDescription(html: "<html><body></body></html>"))
+        XCTAssertNil(HomeStationWidgetFetcher.parseWeatherDescription(html: "<div class=\"descripcio\">  </div>"))
+    }
+
+    func testWeatherIconCodeIsTheFileNameOfTheMeteorsImage() {
+        XCTAssertEqual(HomeStationWidgetFetcher.parseWeatherIconCode(html: Page.current), "8")
+    }
+
+    func testWeatherIconCodeIsNilWithoutTheMeteorImage() {
+        XCTAssertNil(HomeStationWidgetFetcher.parseWeatherIconCode(html: "<div class=\"meteor\"></div>"))
+        XCTAssertNil(HomeStationWidgetFetcher.parseWeatherIconCode(html: "<html><body></body></html>"))
+    }
+
     func testDailyRowsAreTitleAndValueOfEachRow() {
         XCTAssertEqual(pairs(HomeStationWidgetFetcher.parseDailyRows(html: Page.daily)), expectedRows)
     }
@@ -184,6 +204,8 @@ final class HomeStationWidgetFetcherTests: XCTestCase {
 
         XCTAssertEqual(pairs(result.rows), expectedRows)
         XCTAssertEqual(result.rawTemp, "18")
+        XCTAssertEqual(result.weatherDescription, "Tempesta")
+        XCTAssertEqual(result.weatherIconCode, "8")
         XCTAssertEqual(log.count, 2)
         XCTAssertEqual(log.absoluteStrings, Set([
             "https://www.meteo.cat/observacions/xema/dades?codi=CC&dia=2026-10-09T12:00Z",
@@ -282,6 +304,8 @@ final class HomeStationWidgetFetcherTests: XCTestCase {
         XCTAssertEqual(saved?.currentTempAt, now)
         XCTAssertEqual(saved?.maxTemp, "20.1 °C")
         XCTAssertEqual(saved?.minTemp, "12.4 °C")
+        XCTAssertEqual(saved?.weatherDescription, "Tempesta")
+        XCTAssertEqual(saved?.weatherIconCode, "8")
         XCTAssertEqual(saved?.updatedAt, now)
     }
 

@@ -25,14 +25,29 @@ enum HomeStationWidgetValues {
         return text.contains("°") ? text : "\(text) °C"
     }
 
+    /// "8" from `.../meteors/<set>/8.svg`; nil when the URL isn't a meteo.cat sky icon.
+    static func iconCode(from url: URL?) -> String? {
+        guard let url, url.pathComponents.contains("meteors") else { return nil }
+        return nonBlank(url.deletingPathExtension().lastPathComponent)
+    }
+
+    /// SF Symbol for a sky code. Only "8" (Tempesta) is mapped; other codes show no icon until the meteo.cat code list is known.
+    static func symbolName(forIconCode code: String?) -> String? {
+        switch code {
+        case "8": return "cloud.bolt.rain.fill"
+        default: return nil
+        }
+    }
+
+    /// Trimmed text, nil when blank.
+    static func nonBlank(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     // MARK: - Private -
 
     private static func fold(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
-    }
-
-    private static func nonBlank(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 }

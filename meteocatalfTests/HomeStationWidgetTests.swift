@@ -84,6 +84,18 @@ final class HomeStationWidgetTests: XCTestCase {
         XCTAssertEqual(store.load(), saved)
     }
 
+    func testStoreRoundTripsTheSkyDescriptionAndIconCode() {
+        let store = HomeStationWidgetStore(defaults: defaults)
+        let now = date(2026, 10, 9, 10, 30, in: madrid)
+        var saved = snapshot(cityCode: "080193", currentTemp: "18 °C", currentTempAt: now, updatedAt: now)
+        saved.weatherDescription = "Tempesta"
+        saved.weatherIconCode = "8"
+        store.save(saved)
+        XCTAssertEqual(store.load(), saved)
+        XCTAssertEqual(store.load()?.weatherDescription, "Tempesta")
+        XCTAssertEqual(store.load()?.weatherIconCode, "8")
+    }
+
     func testClearRemovesTheSnapshot() {
         let store = HomeStationWidgetStore(defaults: defaults)
         store.save(snapshot(updatedAt: date(2026, 10, 9, 10, 30, in: madrid)))
@@ -104,6 +116,17 @@ final class HomeStationWidgetTests: XCTestCase {
         let loaded = HomeStationWidgetStore(defaults: defaults).load()
         XCTAssertEqual(loaded?.stationCode, "CC")
         XCTAssertNil(loaded?.cityCode)
+    }
+
+    func testSnapshotStoredBeforeTheSkyFieldsExistedStillLoads() {
+        // Written by an older build: no weatherDescription or weatherIconCode keys.
+        let old = Data(#"{"stationName":"Orís","stationCode":"CC","cityCode":"080193","currentTemp":"18 °C","updatedAt":0}"#.utf8)
+        defaults.set(old, forKey: HomeStationWidgetStore.key)
+
+        let loaded = HomeStationWidgetStore(defaults: defaults).load()
+        XCTAssertEqual(loaded?.currentTemp, "18 °C")
+        XCTAssertNil(loaded?.weatherDescription)
+        XCTAssertNil(loaded?.weatherIconCode)
     }
 
     func testStoreWithoutDefaultsDoesNothing() {
@@ -151,6 +174,19 @@ final class HomeStationWidgetTests: XCTestCase {
         XCTAssertNil(HomeStationWidgetValues.extremes(in: empty).min)
     }
 
+    func testOnlyTheStormCodeHasASymbol() {
+        XCTAssertEqual(HomeStationWidgetValues.symbolName(forIconCode: "8"), "cloud.bolt.rain.fill")
+        XCTAssertNil(HomeStationWidgetValues.symbolName(forIconCode: "3"))
+        XCTAssertNil(HomeStationWidgetValues.symbolName(forIconCode: nil))
+    }
+
+    func testIconCodeIsTheFileNameOfTheMeteorsURL() {
+        let url = URL(string: "https://static-m.meteo.cat/assets/images/meteors/estatcel/8.svg")
+        XCTAssertEqual(HomeStationWidgetValues.iconCode(from: url), "8")
+        XCTAssertNil(HomeStationWidgetValues.iconCode(from: URL(string: "https://example.com/icons/8.svg")))
+        XCTAssertNil(HomeStationWidgetValues.iconCode(from: nil))
+    }
+
     func testTemperatureAddsTheUnit() {
         XCTAssertEqual(HomeStationWidgetValues.temperature("18"), "18 °C")
         XCTAssertEqual(HomeStationWidgetValues.temperature("18 °C"), "18 °C")
@@ -194,6 +230,55 @@ final class HomeStationWidgetTests: XCTestCase {
         )
         let recentDisplay = HomeStationWidgetDisplay(snapshot: justRecent, now: now, timeZone: madrid)
         XCTAssertEqual(recentDisplay.currentTemp, "18 °C")
+    }
+
+    func testFreshSkyDescriptionAndSymbolAreShown() {
+        let now = date(2026, 10, 9, 10, 30, in: madrid)
+        var stored = snapshot(currentTemp: "18 °C", currentTempAt: now.addingTimeInterval(-3600), updatedAt: now)
+        stored.weatherDescription = "Tempesta"
+        stored.weatherIconCode = "8"
+
+        let display = HomeStationWidgetDisplay(snapshot: stored, now: now, timeZone: madrid)
+
+        XCTAssertEqual(display.weatherDescription, "Tempesta")
+        XCTAssertEqual(display.weatherSymbol, "cloud.bolt.rain.fill")
+    }
+
+    func testUnmappedSkyCodeShowsTheDescriptionWithoutASymbol() {
+        let now = date(2026, 10, 9, 10, 30, in: madrid)
+        var stored = snapshot(currentTemp: "18 °C", currentTempAt: now, updatedAt: now)
+        stored.weatherDescription = "Cel serè"
+        stored.weatherIconCode = "1"
+
+        let display = HomeStationWidgetDisplay(snapshot: stored, now: now, timeZone: madrid)
+
+        XCTAssertEqual(display.weatherDescription, "Cel serè")
+        XCTAssertNil(display.weatherSymbol)
+    }
+
+    func testSkyDescriptionAndSymbolAreHiddenWhenTheTemperatureIsStale() {
+        let now = date(2026, 10, 9, 14, 0, in: madrid)
+        var stored = snapshot(currentTemp: "18 °C", currentTempAt: now.addingTimeInterval(-3 * 3600 - 1), updatedAt: now)
+        stored.weatherDescription = "Tempesta"
+        stored.weatherIconCode = "8"
+
+        let display = HomeStationWidgetDisplay(snapshot: stored, now: now, timeZone: madrid)
+
+        XCTAssertEqual(display.currentTemp, HomeStationWidgetDisplay.placeholderValue)
+        XCTAssertNil(display.weatherDescription)
+        XCTAssertNil(display.weatherSymbol)
+    }
+
+    func testSkyFieldsWithoutATemperatureTimeAreHidden() {
+        let now = date(2026, 10, 9, 10, 30, in: madrid)
+        var stored = snapshot(currentTemp: "18 °C", updatedAt: now)
+        stored.weatherDescription = "Tempesta"
+        stored.weatherIconCode = "8"
+
+        let display = HomeStationWidgetDisplay(snapshot: stored, now: now, timeZone: madrid)
+
+        XCTAssertNil(display.weatherDescription)
+        XCTAssertNil(display.weatherSymbol)
     }
 
     func testExtremesFromAnotherDayAreHidden() {
@@ -278,6 +363,37 @@ final class HomeStationWidgetTests: XCTestCase {
         XCTAssertEqual(counter.count, 0)
     }
 
+    func testCurrentWeatherReplacesTheSkyFieldsAndDayLoadedKeepsThem() {
+        let now = date(2026, 10, 9, 10, 0, in: madrid)
+        let counter = ReloadCounter()
+        let widget = makeUpdater(counter)
+        let store = HomeStationWidgetStore(defaults: defaults)
+
+        widget.currentWeatherLoaded(
+            stationName: "Orís", stationCode: "CC", rawTemp: "18",
+            weatherDescription: "Tempesta", weatherIconCode: "8", now: now
+        )
+        widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
+        XCTAssertEqual(store.load()?.weatherDescription, "Tempesta")
+        XCTAssertEqual(store.load()?.weatherIconCode, "8")
+
+        let later = now.addingTimeInterval(600)
+        widget.currentWeatherLoaded(
+            stationName: "Orís", stationCode: "CC", rawTemp: "19",
+            weatherDescription: "Cel serè", weatherIconCode: "1", now: later
+        )
+        XCTAssertEqual(store.load()?.weatherDescription, "Cel serè")
+        XCTAssertEqual(store.load()?.weatherIconCode, "1")
+
+        // A reading without the sky fields clears them: they are never kept from an earlier reading.
+        widget.currentWeatherLoaded(
+            stationName: "Orís", stationCode: "CC", rawTemp: "19",
+            weatherDescription: nil, weatherIconCode: nil, now: later.addingTimeInterval(600)
+        )
+        XCTAssertNil(store.load()?.weatherDescription)
+        XCTAssertNil(store.load()?.weatherIconCode)
+    }
+
     func testCurrentWeatherKeepsTheExtremesOfTheSameStation() {
         let counter = ReloadCounter()
         let store = HomeStationWidgetStore(defaults: defaults)
@@ -286,7 +402,7 @@ final class HomeStationWidgetTests: XCTestCase {
         let later = now.addingTimeInterval(600)
 
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
-        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", now: later)
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", weatherDescription: nil, weatherIconCode: nil, now: later)
 
         let saved = store.load()
         XCTAssertEqual(saved?.currentTemp, "18 °C")
@@ -304,7 +420,7 @@ final class HomeStationWidgetTests: XCTestCase {
         let now = date(2026, 10, 9, 12, in: madrid)
 
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
-        widget.currentWeatherLoaded(stationName: "Sant Cugat", stationCode: "XX", rawTemp: "18", now: now)
+        widget.currentWeatherLoaded(stationName: "Sant Cugat", stationCode: "XX", rawTemp: "18", weatherDescription: nil, weatherIconCode: nil, now: now)
 
         let saved = store.load()
         XCTAssertEqual(saved?.stationCode, "XX")
@@ -344,7 +460,7 @@ final class HomeStationWidgetTests: XCTestCase {
 
         widget.homeStationChanged(stationName: "Orís", stationCode: "CC", cityCode: "080193", now: now)
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
-        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now)
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", weatherDescription: nil, weatherIconCode: nil, now: now)
         XCTAssertEqual(counter.count, 3)
 
         widget.homeStationChanged(
@@ -368,7 +484,7 @@ final class HomeStationWidgetTests: XCTestCase {
         let now = date(2026, 10, 9, 12, in: madrid)
 
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
-        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now)
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: "18", weatherDescription: nil, weatherIconCode: nil, now: now)
         widget.homeStationChanged(stationName: "Sant Cugat", stationCode: "XX", cityCode: "080999", now: now)
 
         let saved = store.load()
@@ -393,7 +509,7 @@ final class HomeStationWidgetTests: XCTestCase {
         XCTAssertEqual(store.load()?.cityCode, "080193")
 
         widget.currentWeatherLoaded(
-            stationName: "Orís", stationCode: "CC", rawTemp: "18", now: now.addingTimeInterval(600)
+            stationName: "Orís", stationCode: "CC", rawTemp: "18", weatherDescription: nil, weatherIconCode: nil, now: now.addingTimeInterval(600)
         )
         XCTAssertEqual(store.load()?.cityCode, "080193")
     }
@@ -438,8 +554,8 @@ final class HomeStationWidgetTests: XCTestCase {
         widget.dayLoaded(stationName: "Orís", stationCode: "CC", rows: dailyRows(), date: now, now: now)
         let before = store.load()
 
-        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: " ", now: now.addingTimeInterval(600))
-        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: nil, now: now.addingTimeInterval(600))
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: " ", weatherDescription: nil, weatherIconCode: nil, now: now.addingTimeInterval(600))
+        widget.currentWeatherLoaded(stationName: "Orís", stationCode: "CC", rawTemp: nil, weatherDescription: nil, weatherIconCode: nil, now: now.addingTimeInterval(600))
 
         XCTAssertEqual(store.load(), before)
         XCTAssertEqual(counter.count, 1)

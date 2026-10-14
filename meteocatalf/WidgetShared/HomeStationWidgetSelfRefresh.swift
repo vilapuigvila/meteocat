@@ -51,6 +51,8 @@ struct HomeStationWidgetSelfRefresh {
                 stationName: latest.stationName,
                 stationCode: latest.stationCode,
                 rawTemp: rawTemp,
+                weatherDescription: result.weatherDescription,
+                weatherIconCode: result.weatherIconCode,
                 now: now
             )
         }

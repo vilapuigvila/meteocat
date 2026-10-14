@@ -125,7 +125,14 @@ private struct SmallView: View {
                 .font(.caption.weight(.semibold))
                 .lineLimit(2)
             Spacer(minLength: 0)
-            CurrentTempText(display: display, size: 40)
+            HStack(spacing: 6) {
+                CurrentTempText(display: display, size: 40)
+                if let symbol = display.weatherSymbol {
+                    Image(systemName: symbol)
+                        .font(.title2)
+                        .symbolRenderingMode(.multicolor)
+                }
+            }
             HStack(spacing: 8) {
                 Label(display.maxTemp, systemImage: "arrow.up")
                 Label(display.minTemp, systemImage: "arrow.down")
@@ -151,6 +158,20 @@ private struct MediumView: View {
                     .font(.headline)
                     .lineLimit(2)
                 CurrentTempText(display: display, size: 44)
+                if display.weatherDescription != nil || display.weatherSymbol != nil {
+                    HStack(spacing: 4) {
+                        if let symbol = display.weatherSymbol {
+                            Image(systemName: symbol)
+                                .symbolRenderingMode(.multicolor)
+                        }
+                        if let description = display.weatherDescription {
+                            Text(description)
+                        }
+                    }
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                }
             }
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 6) {

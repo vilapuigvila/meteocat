@@ -177,6 +177,8 @@ final class HomeStationInteractorImpl: HomeStationInteractorProtocol {
                 stationName: UserSettings.homeStation?.name ?? "",
                 stationCode: stationCode,
                 rawTemp: weather.now.currentTemp,
+                weatherDescription: weather.now.weatherDescription,
+                weatherIconCode: HomeStationWidgetValues.iconCode(from: weather.now.iconWeather),
                 now: Date()
             )
             self.lastCurrentWeather = (stationCode, weather.now)

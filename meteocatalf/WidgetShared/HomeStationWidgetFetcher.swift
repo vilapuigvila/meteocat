@@ -15,6 +15,10 @@ struct HomeStationWidgetFetcher: Sendable {
         let rows: [(key: String, value: String)]?
         /// "18", as the page has it; nil when missing.
         let rawTemp: String?
+        /// "Tempesta", from `div.descripcio`; nil when missing.
+        let weatherDescription: String?
+        /// "8", from the sky icon URL; nil when missing.
+        let weatherIconCode: String?
     }
 
     static let timeout: TimeInterval = 10
@@ -33,7 +37,9 @@ struct HomeStationWidgetFetcher: Sendable {
         let currentHTML = await current
         return Result(
             rows: dailyHTML.flatMap { Self.parseDailyRows(html: $0) },
-            rawTemp: currentHTML.flatMap { Self.parseCurrentTemp(html: $0) }
+            rawTemp: currentHTML.flatMap { Self.parseCurrentTemp(html: $0) },
+            weatherDescription: currentHTML.flatMap { Self.parseWeatherDescription(html: $0) },
+            weatherIconCode: currentHTML.flatMap { Self.parseWeatherIconCode(html: $0) }
         )
     }
 
@@ -65,6 +71,22 @@ struct HomeStationWidgetFetcher: Sendable {
             .compactMap { $0 as? TextNode }
             .map { $0.text().trimmingCharacters(in: .whitespacesAndNewlines) }
             .first(where: { !$0.isEmpty })
+    }
+
+    /// Text of `div.descripcio`, as `ServerData.getCurrentWeather` reads it. nil when missing or blank.
+    static func parseWeatherDescription(html: String) -> String? {
+        guard let document = try? SwiftSoup.parse(html),
+              let text = try? document.select("div.descripcio").first()?.text()
+        else { return nil }
+        return HomeStationWidgetValues.nonBlank(text)
+    }
+
+    /// Sky code from the image in `div.meteor`, e.g. "8" for `.../meteors/estatcel/8.svg`. nil when missing.
+    static func parseWeatherIconCode(html: String) -> String? {
+        guard let document = try? SwiftSoup.parse(html),
+              let src = try? document.select("div.meteor img").first()?.attr("src")
+        else { return nil }
+        return HomeStationWidgetValues.iconCode(from: URL(string: src))
     }
 
     /// Rows of the daily table, as `ServerData.parseDailySummary` reads them. nil when the page has no table or its

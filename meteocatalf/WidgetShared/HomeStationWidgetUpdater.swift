@@ -10,7 +10,10 @@ import WidgetKit
 protocol HomeStationWidgetUpdating {
     /// Today's table for the home station. Ignored when `date` isn't today (the user browsed another day).
     func dayLoaded(stationName: String, stationCode: String, rows: [(key: String, value: String)], date: Date, now: Date)
-    func currentWeatherLoaded(stationName: String, stationCode: String, rawTemp: String?, now: Date)
+    /// The sky description and icon code arrive with the temperature and replace the previous ones, nil included.
+    func currentWeatherLoaded(
+        stationName: String, stationCode: String, rawTemp: String?, weatherDescription: String?, weatherIconCode: String?, now: Date
+    )
     /// The home station changed: values of the previous one must not be shown under the new name.
     /// Same station with another city code: the values are kept and only the city code changes.
     func homeStationChanged(stationName: String, stationCode: String, cityCode: String, now: Date)
@@ -42,12 +45,16 @@ struct HomeStationWidgetUpdater: HomeStationWidgetUpdating {
         save(snapshot)
     }
 
-    func currentWeatherLoaded(stationName: String, stationCode: String, rawTemp: String?, now: Date) {
+    func currentWeatherLoaded(
+        stationName: String, stationCode: String, rawTemp: String?, weatherDescription: String?, weatherIconCode: String?, now: Date
+    ) {
         guard let temperature = HomeStationWidgetValues.temperature(rawTemp) else { return }
 
         var snapshot = base(stationName: stationName, stationCode: stationCode, now: now)
         snapshot.currentTemp = temperature
         snapshot.currentTempAt = now
+        snapshot.weatherDescription = weatherDescription
+        snapshot.weatherIconCode = weatherIconCode
         save(snapshot)
     }
 
@@ -82,6 +89,8 @@ struct HomeStationWidgetUpdater: HomeStationWidgetUpdating {
             cityCode: stored.cityCode,
             currentTemp: stored.currentTemp,
             currentTempAt: stored.currentTempAt,
+            weatherDescription: stored.weatherDescription,
+            weatherIconCode: stored.weatherIconCode,
             maxTemp: stored.maxTemp,
             minTemp: stored.minTemp,
             extremesDay: stored.extremesDay,

@@ -19,6 +19,10 @@ struct HomeStationWidgetDisplay: Equatable, Sendable {
     /// "--" unless the extremes belong to today.
     let maxTemp: String
     let minTemp: String
+    /// "Tempesta". nil unless the current temperature is fresh and the page had a description.
+    let weatherDescription: String?
+    /// SF Symbol for the sky. nil unless the current temperature is fresh and the code is one we map.
+    let weatherSymbol: String?
     /// "HH:mm" of `updatedAt`.
     let updatedTime: String
     let isStale: Bool
@@ -32,15 +36,29 @@ struct HomeStationWidgetDisplay: Equatable, Sendable {
         currentTemp = (isCurrentFresh ? snapshot.currentTemp : nil) ?? Self.placeholderValue
         maxTemp = (isExtremesToday ? snapshot.maxTemp : nil) ?? Self.placeholderValue
         minTemp = (isExtremesToday ? snapshot.minTemp : nil) ?? Self.placeholderValue
+        // Same age as the temperature: an old description is never shown.
+        weatherDescription = isCurrentFresh ? snapshot.weatherDescription : nil
+        weatherSymbol = isCurrentFresh ? HomeStationWidgetValues.symbolName(forIconCode: snapshot.weatherIconCode) : nil
         updatedTime = Self.formattedTime(snapshot.updatedAt, timeZone: timeZone)
         isStale = now.timeIntervalSince(snapshot.updatedAt) > Self.staleAfter
     }
 
-    init(stationName: String, currentTemp: String, maxTemp: String, minTemp: String, updatedTime: String, isStale: Bool) {
+    init(
+        stationName: String,
+        currentTemp: String,
+        maxTemp: String,
+        minTemp: String,
+        weatherDescription: String? = nil,
+        weatherSymbol: String? = nil,
+        updatedTime: String,
+        isStale: Bool
+    ) {
         self.stationName = stationName
         self.currentTemp = currentTemp
         self.maxTemp = maxTemp
         self.minTemp = minTemp
+        self.weatherDescription = weatherDescription
+        self.weatherSymbol = weatherSymbol
         self.updatedTime = updatedTime
         self.isStale = isStale
     }
@@ -51,6 +69,8 @@ struct HomeStationWidgetDisplay: Equatable, Sendable {
         currentTemp: "18 °C",
         maxTemp: "21.3 °C",
         minTemp: "12.4 °C",
+        weatherDescription: "Núvols i sol",
+        weatherSymbol: "cloud.sun.fill",
         updatedTime: "10:30",
         isStale: false
     )

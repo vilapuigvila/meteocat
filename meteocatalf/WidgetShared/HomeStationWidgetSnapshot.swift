@@ -14,6 +14,10 @@ struct HomeStationWidgetSnapshot: Codable, Equatable, Sendable {
     /// "18 °C", nil until a reading arrived.
     var currentTemp: String?
     var currentTempAt: Date?
+    /// "Tempesta", from `div.descripcio`. Written with `currentTemp`, so it has the same age. nil in older snapshots.
+    var weatherDescription: String?
+    /// meteo.cat sky code from the icon URL, e.g. "8". Written with `currentTemp`. nil in older snapshots.
+    var weatherIconCode: String?
     /// "21.3 °C"
     var maxTemp: String?
     var minTemp: String?
